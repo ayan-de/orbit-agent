@@ -23,7 +23,7 @@
 
 | Step | Task | File(s) | Status |
 |------|------|---------|--------|
-| 1 | Get FastAPI server running | `src/main.py` | ⬜ |
+| 1 | Get FastAPI server running | `src/main.py` | ✅ |
 | 2 | Wire up LLM (Gemini/OpenAI) | `src/llm/factory.py`, `src/llm/gemini.py` | ⬜ |
 | 3 | Build Classifier Node — classify user intent | `src/agent/nodes/classifier.py`, `src/agent/prompts/classifier.py` | ⬜ |
 | 4 | Build Responder Node — format final response | `src/agent/nodes/responder.py`, `src/agent/prompts/responder.py` | ⬜ |
