@@ -13,7 +13,10 @@
 | 2 | **Tools + Memory** | Weeks 3-5 | Multi-step plans, conversation history, PostgreSQL persistence |
 | 3 | **Jira + Git + Email** | Weeks 6-9 | External service tools + human-in-the-loop confirmation |
 | 4 | **Memory + RAG** | Weeks 10-13 | Long-term memory, project indexing, semantic search (pgvector) |
-| 5 | **Autonomous Workflows** | Weeks 14-16 | Full end-to-end workflows, sub-graphs, error recovery |
+| 5 | **Autonomous Workflows** | Weeks 14-17 | Full end-to-end workflows, sub-graphs, error recovery |
+| 6 | **Testing Suite** | Weeks 18-20 | Comprehensive test coverage (unit, integration, e2e) |
+| 7 | **Documentation & CLI** | Weeks 21-22 | Complete docs and developer tooling |
+| 8 | **DevOps & CI/CD** | Weeks 23-24 | Automated testing, building, deployment pipeline |
 
 ---
 
@@ -24,7 +27,7 @@
 | Step | Task | File(s) | Status |
 |------|------|---------|--------|
 | 1 | Get FastAPI server running | `src/main.py` | ✅ |
-| 2 | Wire up LLM (Gemini/OpenAI) | `src/llm/factory.py`, `src/llm/gemini.py` | ⬜ |
+| 2 | Wire up LLM (OpenAI/Anthropic/Gemini) | `src/llm/factory.py`, `src/llm/openai.py`, `src/llm/anthropic.py`, `src/llm/gemini.py` | ⬜ |
 | 3 | Build Classifier Node — classify user intent | `src/agent/nodes/classifier.py`, `src/agent/prompts/classifier.py` | ⬜ |
 | 4 | Build Responder Node — format final response | `src/agent/nodes/responder.py`, `src/agent/prompts/responder.py` | ⬜ |
 | 5 | Wire minimal LangGraph (classify → respond) | `src/agent/graph.py`, `src/agent/edges.py` | ⬜ |
@@ -92,6 +95,7 @@ User: "create a folder called test, then list its contents"
 | 3 | Build GitHub tool — list PRs, create PR | `src/tools/github.py` | ⬜ |
 | 4 | Build Email tool — send/read emails | `src/tools/email.py` | ⬜ |
 | 5 | Build VS Code tool — open project/file | `src/tools/vscode.py` | ⬜ |
+| 6 | Build Browser tool — web scraping | `src/tools/browser.py` | ⬜ |
 | 6 | Build Human Input Node — pause for confirmation | `src/agent/nodes/human_input.py` | ⬜ |
 | 7 | Wire human-in-the-loop edges in graph | `src/agent/graph.py`, `src/agent/edges.py` | ⬜ |
 | 8 | Build Auth middleware — JWT/API-key verification | `src/api/middleware/auth.py` | ⬜ |
@@ -141,7 +145,7 @@ User: "what was I working on last week?"
 
 ---
 
-## Phase 5: Autonomous Workflows (Weeks 14-16)
+## Phase 5: Autonomous Workflows (Weeks 14-17)
 
 **Goal**: Agent executes full end-to-end workflows automatically.
 
@@ -151,7 +155,7 @@ User: "what was I working on last week?"
 | 2 | Create "Fix Jira Ticket" workflow template | `src/workflows/fix_ticket.py` | ⬜ |
 | 3 | Create "Code Review" workflow template | `src/workflows/code_review.py` | ⬜ |
 | 4 | Create "Deploy" workflow template | `src/workflows/deploy.py` | ⬜ |
-| 5 | Build Sub-graph system — nested LangGraph graphs | `src/agent/subgraphs/` | ⬜ |
+| 5 | Build Sub-graph system — nested LangGraph graphs | `src/agent/subgraphs/`, `src/agent/subgraphs/__init__.py` | ⬜ |
 | 6 | Build Error Recovery — auto-retry, rollback, fallback | `src/utils/retry.py`, `src/agent/nodes/error_handler.py` | ⬜ |
 | 7 | Build Parallel Tool Execution | `src/agent/nodes/parallel_executor.py` | ⬜ |
 | 8 | Build Workflow trigger detection in classifier | `src/agent/nodes/classifier.py` | ⬜ |
@@ -173,14 +177,78 @@ User: "fix PROJ-123 and push"
 
 ---
 
+## Phase 6: Testing Suite (Weeks 18-20)
+
+**Goal**: Comprehensive test coverage for reliability and confidence in deployments.
+
+| Step | Task | File(s) | Status |
+|------|------|---------|--------|
+| 1 | Set up pytest configuration with fixtures | `pytest.ini`, `tests/conftest.py` | ⬜ |
+| 2 | Mock LLM responses for unit tests | `tests/unit/mocks/mock_llm.py`, `tests/conftest.py` | ⬜ |
+| 3 | Write unit tests for all nodes | `tests/unit/test_classifier.py`, `tests/unit/test_planner.py`, `tests/unit/test_executor.py`, `tests/unit/test_evaluator.py` | ⬜ |
+| 4 | Write unit tests for tools | `tests/unit/test_tools/test_shell.py`, `tests/unit/test_tools/test_jira.py`, `tests/unit/test_tools/test_git.py` | ⬜ |
+| 5 | Write integration tests for agent flows | `tests/integration/test_agent_flow.py` | ⬜ |
+| 6 | Write integration tests for API endpoints | `tests/integration/test_api.py` | ⬜ |
+| 7 | Write integration tests for database layer | `tests/integration/test_db.py` | ⬜ |
+| 8 | Write e2e tests for full pipeline | `tests/e2e/test_full_pipeline.py` | ⬜ |
+| 9 | Write tests for error recovery and retry logic | `tests/unit/test_retry.py`, `tests/e2e/test_error_recovery.py` | ⬜ |
+| 10 | Set up test database with fixtures | `tests/fixtures/test_db.sql`, `tests/fixtures/seed_data.py` | ⬜ |
+| 11 | Configure test coverage reporting | `.coveragerc`, `Makefile` (test-coverage target) | ⬜ |
+| 12 | Set up pre-commit hooks (ruff, mypy, tests) | `.pre-commit-config.yaml` | ⬜ |
+
+---
+
+## Phase 7: Documentation & CLI Tools (Weeks 21-22)
+
+**Goal**: Complete documentation for users and developers, useful CLI tools.
+
+| Step | Task | File(s) | Status |
+|------|------|---------|--------|
+| 1 | Write API documentation (OpenAPI/Swagger) | Auto-generated via FastAPI, customize descriptions | ⬜ |
+| 2 | Write Developer Setup Guide | `docs/DEVELOPER_SETUP.md` | ⬜ |
+| 3 | Write Deployment Guide | `docs/DEPLOYMENT.md` | ⬜ |
+| 4 | Write Tool Development Guide | `docs/TOOL_DEVELOPMENT.md` | ⬜ |
+| 5 | Write Workflow Template Guide | `docs/WORKFLOW_TEMPLATES.md` | ⬜ |
+| 6 | Write Troubleshooting Guide | `docs/TROUBLESHOOTING.md` | ⬜ |
+| 7 | Update README with quick start and architecture | `README.md` | ⬜ |
+| 8 | Build CLI tool for testing agent without API | `scripts/run_agent_cli.py` | ⬜ |
+| 9 | Build database seed script for development | `scripts/seed_db.py` | ⬜ |
+| 10 | Build database reset/clean script | `scripts/reset_db.py` | ⬜ |
+| 11 | Build migration management script helpers | `Makefile` (migrate, rollback, upgrade targets) | ⬜ |
+
+---
+
+## Phase 8: DevOps & CI/CD (Weeks 23-24)
+
+**Goal**: Automated testing, building, and deployment pipeline.
+
+| Step | Task | File(s) | Status |
+|------|------|---------|--------|
+| 1 | Set up GitHub Actions workflow for CI | `.github/workflows/ci.yml` | ⬜ |
+| 2 | Configure automated testing on PRs | `.github/workflows/ci.yml` | ⬜ |
+| 3 | Configure automated linting and type checking | `.github/workflows/ci.yml` | ⬜ |
+| 4 | Set up GitHub Actions workflow for CD | `.github/workflows/cd.yml` | ⬜ |
+| 5 | Configure Docker multi-stage build | `Dockerfile` (production optimized) | ⬜ |
+| 6 | Configure Kubernetes/Helm charts (optional) | `k8s/`, `helm/orbit-agent/` | ⬜ |
+| 7 | Set up secrets management | `.env.example`, documentation | ⬜ |
+| 8 | Configure production health checks | `src/api/v1/health.py` (enhanced) | ⬜ |
+| 9 | Set up monitoring and logging (Prometheus/Grafana) | `src/utils/monitoring.py`, docker-compose.yml | ⬜ |
+| 10 | Configure backup strategy for PostgreSQL | docker-compose.yml, backup scripts | ⬜ |
+| 11 | Set up deployment to production environment | Documentation + scripts | ⬜ |
+
+---
+
 ## 📊 Total Progress
 
 ```
-Phase 1  ░░░░░░░░░░   0/9   NLP → Shell
+Phase 1  ░░░░░░░░░░   1/9   NLP → Shell
 Phase 2  ░░░░░░░░░░   0/16  Tools + Memory
-Phase 3  ░░░░░░░░░░   0/13  Jira, Git, Email
+Phase 3  ░░░░░░░░░░   0/14  Jira, Git, Email
 Phase 4  ░░░░░░░░░░   0/10  Memory + RAG
 Phase 5  ░░░░░░░░░░   0/10  Autonomous Workflows
+Phase 6  ░░░░░░░░░░   0/12  Testing Suite
+Phase 7  ░░░░░░░░░░   0/11  Documentation & CLI
+Phase 8  ░░░░░░░░░░   0/11  DevOps & CI/CD
 ─────────────────────────────
-Total    ░░░░░░░░░░   0/58  steps
+Total    ░░░░░░░░░░   1/93  steps
 ```

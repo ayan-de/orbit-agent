@@ -44,7 +44,7 @@
 |--------|--------|------------|
 | LangGraph maturity | ✅ Primary SDK, most examples | ⚠️ Secondary, fewer examples |
 | ML/AI ecosystem | ✅ Native home (numpy, transformers) | ⚠️ Limited |
-| LLM provider SDKs | ✅ First-class support | ✅ Good support |
+| LLM provider SDKs | ✅ First-class support (OpenAI, Anthropic, Gemini) | ✅ Good support |
 | Your existing infra | ⚠️ New service to deploy | ✅ Lives in NestJS |
 | Agent debugging tools | ✅ LangSmith, rich tracing | ⚠️ Fewer options |
 
@@ -100,13 +100,26 @@ orbit-agent/                          # Root of the Python agent project
 │   │   │   ├── planner.py            # Plan multi-step execution
 │   │   │   ├── executor.py           # Execute tools
 │   │   │   ├── evaluator.py          # Evaluate results, decide next step
+│   │   │   ├── context_retriever.py  # Retrieve context before LLM calls (RAG)
 │   │   │   ├── responder.py          # Format final response
-│   │   │   └── human_input.py        # Pause for user confirmation
+│   │   │   ├── human_input.py        # Pause for user confirmation
+│   │   │   ├── error_handler.py      # Error recovery and fallback
+│   │   │   └── parallel_executor.py  # Parallel tool execution node
 │   │   ├── edges.py                  # Conditional edge logic
+│   │   ├── subgraphs/                # Nested LangGraph graphs for complex workflows
+│   │   │   ├── __init__.py
+│   │   │   └── base.py               # Base subgraph builder
 │   │   └── prompts/                  # System prompts (version-controlled)
 │   │       ├── classifier.py
 │   │       ├── planner.py
 │   │       └── responder.py
+│   │
+│   ├── workflows/                    # Pre-built workflow templates
+│   │   ├── __init__.py
+│   │   ├── templates.py              # Workflow template base class
+│   │   ├── fix_ticket.py             # Fix Jira ticket workflow
+│   │   ├── code_review.py            # Code review workflow
+│   │   └── deploy.py                 # Deployment workflow
 │   │
 │   ├── tools/                        # Agent tools (LangChain Tool subclasses)
 │   │   ├── __init__.py
@@ -125,7 +138,9 @@ orbit-agent/                          # Root of the Python agent project
 │   │   ├── __init__.py
 │   │   ├── checkpointer.py           # LangGraph PostgreSQL checkpointer
 │   │   ├── conversation.py           # Conversation history manager
-│   │   └── summary.py               # Auto-summarize long conversations
+│   │   ├── summary.py               # Auto-summarize long conversations
+│   │   ├── embeddings.py             # Embedding generation and storage
+│   │   └── indexer.py                # Project and content indexing for RAG
 │   │
 │   ├── db/                           # Database layer
 │   │   ├── __init__.py
@@ -141,7 +156,8 @@ orbit-agent/                          # Root of the Python agent project
 │   │   ├── __init__.py
 │   │   ├── factory.py                # Create LLM by provider name
 │   │   ├── openai.py                 # OpenAI ChatModel wrapper
-│   │   └── anthropic.py             # Anthropic ChatModel wrapper
+│   │   ├── anthropic.py              # Anthropic ChatModel wrapper
+│   │   └── gemini.py                 # Google Gemini ChatModel wrapper
 │   │
 │   ├── bridge/                       # NestJS Bridge communication client
 │   │   ├── __init__.py
@@ -180,11 +196,13 @@ orbit-agent/                          # Root of the Python agent project
 | `src/api/` | FastAPI routes — the HTTP/WebSocket interface the NestJS Bridge calls |
 | `src/agent/` | LangGraph graph definition, nodes, edges — the "brain" |
 | `src/agent/nodes/` | Each node is a pure function: `(state) → state`. Clean, testable |
+| `src/agent/subgraphs/` | Nested LangGraph graphs for complex workflows |
 | `src/agent/prompts/` | Version-controlled system prompts, separate from logic |
+| `src/workflows/` | Pre-built workflow templates for common patterns |
 | `src/tools/` | Each tool is a `BaseTool` subclass with `_run()` / `_arun()` |
-| `src/memory/` | PostgreSQL-backed checkpointer for LangGraph + conversation history |
+| `src/memory/` | PostgreSQL-backed checkpointer for LangGraph + conversation history + embeddings |
 | `src/db/` | SQLAlchemy async models + repository pattern for clean data access |
-| `src/llm/` | Provider abstraction — swap OpenAI ↔ Anthropic without touching agent code |
+| `src/llm/` | Provider abstraction — swap OpenAI ↔ Anthropic ↔ Gemini without touching agent code |
 | `src/bridge/` | HTTP client to communicate back to NestJS (send results, get desktop status) |
 | `migrations/` | Alembic migrations for full schema version control |
 
@@ -488,6 +506,7 @@ CREATE TABLE agent_tool_calls (
 | **GitHub** | `src/tools/github.py` | `list_prs(repo)`, `get_pr(number)`, `create_pr(title, body)` |
 | **Email** | `src/tools/email.py` | `send_email(to, subject, body)`, `read_inbox(count)` |
 | **VS Code** | `src/tools/vscode.py` | `open_project(path)`, `open_file(path)` |
+| **Browser** | `src/tools/browser.py` | `scrape(url)`, `screenshot(url)`, `navigate(url)` |
 
 #### Human-in-the-Loop for Dangerous Actions
 
@@ -517,6 +536,130 @@ When the user responds "yes", the Bridge re-invokes the agent with the same `thr
 3. **Project indexer** — index file trees, README, package.json
 4. **Context retrieval node** — inject relevant context before LLM calls
 
+#### Context Retrieval Node
+
+```python
+# src/agent/nodes/context_retriever.py
+from typing import Optional
+from src.agent.state import AgentState
+from src.memory.embeddings import EmbeddingService
+from langchain_core.messages import SystemMessage
+
+async def retrieve_context(state: AgentState, config) -> dict:
+    """Retrieve relevant context from embeddings before LLM calls."""
+    embedding_service: EmbeddingService = config["configurable"]["embedding_service"]
+    last_message = state["messages"][-1].content
+
+    # Search for relevant context
+    context = await embedding_service.search(
+        query=last_message,
+        user_id=state["user_id"],
+        limit=5
+    )
+
+    if context:
+        # Inject context as a system message
+        context_str = "\n".join([c["content"] for c in context])
+        return {
+            "messages": [SystemMessage(
+                content=f"Relevant context:\n{context_str}"
+            )]
+        }
+    return {}
+```
+
+#### Embedding Service
+
+```python
+# src/memory/embeddings.py
+from typing import List
+from openai import AsyncOpenAI
+import asyncpg
+from src.config import settings
+
+class EmbeddingService:
+    def __init__(self):
+        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        self.db_url = settings.DATABASE_URL
+
+    async def generate_embedding(self, text: str) -> List[float]:
+        """Generate embedding for text using OpenAI."""
+        response = await self.client.embeddings.create(
+            model="text-embedding-3-small",
+            input=text
+        )
+        return response.data[0].embedding
+
+    async def store(self, user_id: str, source: str, content: str, metadata: dict):
+        """Generate and store an embedding."""
+        embedding = await self.generate_embedding(content)
+        async with asyncpg.connect(self.db_url) as conn:
+            await conn.execute(
+                """INSERT INTO embeddings (user_id, source, content, metadata, embedding)
+                   VALUES ($1, $2, $3, $4, $5)""",
+                user_id, source, content, metadata, embedding
+            )
+
+    async def search(self, query: str, user_id: str, limit: int = 5) -> List[dict]:
+        """Search for relevant embeddings."""
+        query_embedding = await self.generate_embedding(query)
+        async with asyncpg.connect(self.db_url) as conn:
+            rows = await conn.fetch(
+                """SELECT content, metadata, 1 - (embedding <=> $1) as similarity
+                   FROM embeddings
+                   WHERE user_id = $2
+                   ORDER BY embedding <=> $1
+                   LIMIT $3""",
+                query_embedding, user_id, limit
+            )
+            return [{"content": r["content"], "metadata": r["metadata"],
+                    "similarity": r["similarity"]} for r in rows]
+```
+
+#### Project Indexer
+
+```python
+# src/memory/indexer.py
+from pathlib import Path
+from src.memory.embeddings import EmbeddingService
+from src.config import settings
+
+class ProjectIndexer:
+    def __init__(self, embedding_service: EmbeddingService):
+        self.embedding_service = embedding_service
+
+    async def index_directory(self, project_path: str, user_id: str):
+        """Index all files in a project directory."""
+        path = Path(project_path)
+        for file_path in path.rglob("*.py"):
+            content = file_path.read_text()
+            await self.embedding_service.store(
+                user_id=user_id,
+                source="project",
+                content=content,
+                metadata={
+                    "project": project_path,
+                    "file": str(file_path),
+                    "file_type": "code"
+                }
+            )
+
+        # Index README if exists
+        readme_path = path / "README.md"
+        if readme_path.exists():
+            content = readme_path.read_text()
+            await self.embedding_service.store(
+                user_id=user_id,
+                source="project",
+                content=content,
+                metadata={
+                    "project": project_path,
+                    "file": str(readme_path),
+                    "file_type": "readme"
+                }
+            )
+```
+
 ```sql
 -- Add to existing PostgreSQL
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -544,6 +687,157 @@ CREATE INDEX ON embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lis
 - **Sub-graphs** — nested LangGraph graphs for complex tool chains
 - **Error recovery** — automatic retry, rollback, human fallback
 - **Parallel tool execution** — run independent steps concurrently
+
+#### Workflow Template System
+
+```python
+# src/workflows/templates.py
+from abc import ABC, abstractmethod
+from langgraph.graph import StateGraph
+from src.agent.state import AgentState
+
+class WorkflowTemplate(ABC):
+    """Base class for workflow templates."""
+
+    @abstractmethod
+    def build_graph(self) -> StateGraph:
+        """Build the LangGraph for this workflow."""
+        pass
+
+    @abstractmethod
+    def get_name(self) -> str:
+        """Return the workflow name."""
+        pass
+```
+
+#### Fix Jira Ticket Workflow
+
+```python
+# src/workflows/fix_ticket.py
+from src.workflows.templates import WorkflowTemplate
+from langgraph.graph import StateGraph, START, END
+
+class FixTicketWorkflow(WorkflowTemplate):
+    def get_name(self) -> str:
+        return "fix_ticket"
+
+    def build_graph(self) -> StateGraph:
+        graph = StateGraph(AgentState)
+        graph.add_node("fetch_ticket", fetch_ticket_details)
+        graph.add_node("checkout_branch", create_fix_branch)
+        graph.add_node("analyze_and_fix", analyze_and_apply_fix)
+        graph.add_node("run_tests", test_fix)
+        graph.add_node("commit", commit_fix)
+        graph.add_node("push", push_changes)
+        graph.add_node("update_jira", close_ticket)
+
+        graph.add_edge(START, "fetch_ticket")
+        graph.add_edge("fetch_ticket", "checkout_branch")
+        graph.add_edge("checkout_branch", "analyze_and_fix")
+        graph.add_conditional_edges("analyze_and_fix", should_test, {
+            "test": "run_tests", "skip": "commit"
+        })
+        graph.add_edge("run_tests", "commit")
+        graph.add_edge("commit", "push")
+        graph.add_edge("push", "update_jira")
+        graph.add_edge("update_jira", END)
+
+        return graph.compile()
+```
+
+#### Error Handler Node
+
+```python
+# src/agent/nodes/error_handler.py
+from src.agent.state import AgentState
+from src.utils.retry import RetryConfig
+
+async def handle_error(state: AgentState, config) -> dict:
+    """Handle errors with retry, fallback, or human intervention."""
+    last_error = state.get("last_error")
+
+    if not last_error:
+        return {}
+
+    retry_config: RetryConfig = config["configurable"].get("retry_config")
+    current_retries = state.get("retry_count", 0)
+
+    if current_retries < retry_config.max_retries:
+        # Retry the current step
+        return {
+            "retry_count": current_retries + 1,
+            "messages": [SystemMessage(content=f"Retrying... Attempt {current_retries + 1}")]
+        }
+
+    # Max retries reached - escalate to human
+    return {
+        "needs_confirmation": True,
+        "confirmation_prompt": f"⚠️ Error after {current_retries} retries: {last_error}. Please provide guidance or abort.",
+        "is_complete": False
+    }
+```
+
+#### Parallel Executor
+
+```python
+# src/agent/nodes/parallel_executor.py
+from typing import List
+import asyncio
+from src.agent.state import AgentState
+
+async def execute_parallel_tools(state: AgentState, config) -> dict:
+    """Execute independent tools in parallel."""
+    parallel_steps = state.get("parallel_steps", [])
+    tool_registry = config["configurable"]["tools"]
+
+    # Execute all tools in parallel
+    tasks = []
+    for step in parallel_steps:
+        tool = tool_registry.get(step["action"])
+        tasks.append(tool.ainvoke(step["args"]))
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    tool_results = []
+    for step, result in zip(parallel_steps, results):
+        if isinstance(result, Exception):
+            tool_results.append({
+                "tool": step["action"],
+                "success": False,
+                "error": str(result)
+            })
+        else:
+            tool_results.append({
+                "tool": step["action"],
+                "success": True,
+                "output": result
+            })
+
+    return {"tool_results": tool_results}
+```
+
+#### Sub-Graph System
+
+```python
+# src/agent/subgraphs/base.py
+from langgraph.graph import StateGraph
+from src.agent.state import AgentState
+
+def build_fix_ticket_subgraph() -> StateGraph:
+    """Build a sub-graph for fixing Jira tickets."""
+    from src.workflows.fix_ticket import FixTicketWorkflow
+    workflow = FixTicketWorkflow()
+    return workflow.build_graph()
+
+def build_code_review_subgraph() -> StateGraph:
+    """Build a sub-graph for code reviews."""
+    graph = StateGraph(AgentState)
+    graph.add_node("fetch_pr", fetch_pull_request)
+    graph.add_node("analyze_code", analyze_code_changes)
+    graph.add_node("post_review", post_review_comment)
+    # ... wire edges ...
+    return graph.compile()
+```
 
 ---
 
@@ -867,6 +1161,78 @@ async def stream_agent(websocket: WebSocket):
 | `/api/v1/sessions` | GET/POST | Bridge → Agent | Manage sessions |
 | `/api/desktop/execute` | POST | Agent → Bridge | Execute shell cmd on desktop |
 
+### Bridge Client & Schemas
+
+```python
+# src/bridge/client.py
+import httpx
+from src.config import settings
+from src.bridge.schemas import ExecuteCommandRequest, ExecuteCommandResponse
+
+class BridgeClient:
+    """HTTP client to communicate with the NestJS Bridge."""
+
+    def __init__(self):
+        self.base_url = settings.BRIDGE_URL
+        self.timeout = 30.0
+
+    async def execute_command(
+        self,
+        command: str,
+        working_dir: str | None = None,
+        timeout: int = 30000
+    ) -> ExecuteCommandResponse:
+        """Execute a shell command on the desktop via Bridge."""
+        request = ExecuteCommandRequest(
+            session_id="",  # Set by caller
+            command=command,
+            working_dir=working_dir,
+            timeout=timeout
+        )
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/api/desktop/execute",
+                json=request.model_dump(),
+                timeout=self.timeout
+            )
+            return ExecuteCommandResponse(**response.json())
+
+    async def get_desktop_status(self) -> dict:
+        """Get the status of the desktop TUI."""
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/api/desktop/status",
+                timeout=10.0
+            )
+            return response.json()
+```
+
+```python
+# src/bridge/schemas.py
+from pydantic import BaseModel, Field
+
+class ExecuteCommandRequest(BaseModel):
+    """Request to execute a command on the desktop."""
+    session_id: str = Field(..., description="Session ID for tracking")
+    command: str = Field(..., description="Shell command to execute")
+    working_dir: str | None = Field(default=None, description="Working directory")
+    timeout: int = Field(default=30000, description="Timeout in milliseconds")
+
+class ExecuteCommandResponse(BaseModel):
+    """Response from command execution."""
+    success: bool = Field(..., description="Whether command succeeded")
+    output: str = Field(..., description="Command stdout/stderr output")
+    exit_code: int = Field(..., description="Process exit code")
+    duration_ms: int | None = Field(default=None, description="Execution duration")
+
+class DesktopStatusResponse(BaseModel):
+    """Desktop TUI status."""
+    status: str = Field(..., description="Connection status")
+    user: str | None = Field(default=None, description="Current user")
+    hostname: str | None = Field(default=None, description="Hostname")
+```
+
 ---
 
 ## 8. Learning Roadmap
@@ -939,6 +1305,9 @@ dependencies = [
     # HTTP client (for Bridge + external APIs)
     "httpx>=0.27.0",
 
+    # Browser automation (for web scraping)
+    "playwright>=1.48.0",
+
     # Utilities
     "python-dotenv>=1.0.0",
     "structlog>=24.0.0",
@@ -965,9 +1334,12 @@ dev = [
 | **2. Tools + Memory** | 3-5 | Multi-step plans, PostgreSQL memory, streaming |
 | **3. Jira, Git, Email** | 6-9 | External service tools, human-in-the-loop |
 | **4. RAG + Context** | 10-13 | pgvector search, project indexing |
-| **5. Autonomous Workflows** | 14-16 | Templates, sub-graphs, error recovery |
+| **5. Autonomous Workflows** | 14-17 | Templates, sub-graphs, error recovery |
+| **6. Testing Suite** | 18-20 | Comprehensive test coverage (unit, integration, e2e) |
+| **7. Documentation & CLI** | 21-22 | Complete docs and developer tooling |
+| **8. DevOps & CI/CD** | 23-24 | Automated testing, building, deployment pipeline |
 
-**Total: ~16 weeks to production-grade agent**
+**Total: ~24 weeks to production-ready agent**
 
 ### Best Practices
 
