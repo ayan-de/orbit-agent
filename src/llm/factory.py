@@ -14,6 +14,6 @@ def llm_factory(provider: str = None, model_name: str = None, temperature: float
     elif provider == "anthropic":
         return get_anthropic_model(model_name or "claude-3-opus-20240229", temperature)
     elif provider == "gemini":
-        return get_gemini_model(model_name or "gemini-flash-latest", temperature)
+        return get_gemini_model(model_name or "gemini-2.0-flash", temperature)
     else:
         raise ValueError(f"Unsupported LLM provider: {provider}")
