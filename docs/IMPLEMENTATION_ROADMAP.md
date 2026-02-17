@@ -34,7 +34,7 @@
 | 6 | Build Bridge Client — HTTP to NestJS Bridge | `src/bridge/client.py`, `src/bridge/schemas.py` | ✅ |
 | 7 | Build Shell Tool — NLP to shell command | `src/tools/shell.py`, `src/tools/base.py` | ✅ |
 | 8 | Build Safety Classifier — block dangerous cmds | `src/utils/safety.py` | ✅ |
-| 9 | Wire `/agent/invoke` endpoint | `src/api/v1/agent.py` | ⬜ |
+| 9 | Wire `/agent/invoke` endpoint | `src/api/v1/agent.py` | ✅ |
 
 ```
 User Message
@@ -241,7 +241,7 @@ User: "fix PROJ-123 and push"
 ## 📊 Total Progress
 
 ```
-Phase 1  ░░░░░░░░░░   8/9   NLP → Shell
+Phase 1  ░░░░░░░░░░   9/9   NLP → Shell
 Phase 2  ░░░░░░░░░░   0/16  Tools + Memory
 Phase 3  ░░░░░░░░░░   0/14  Jira, Git, Email
 Phase 4  ░░░░░░░░░░   0/10  Memory + RAG
@@ -250,5 +250,5 @@ Phase 6  ░░░░░░░░░░   0/12  Testing Suite
 Phase 7  ░░░░░░░░░░   0/11  Documentation & CLI
 Phase 8  ░░░░░░░░░░   0/11  DevOps & CI/CD
 ─────────────────────────────
-Total    ░░░░░░░░░░   8/93  steps
+Total    ░░░░░░░░░░   9/93  steps
 ```
