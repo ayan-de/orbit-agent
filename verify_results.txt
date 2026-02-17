@@ -1,0 +1,19 @@
+--- Testing Classifier Node ---
+
+Testing Input: 'pwd'
+✅ PASS: Classified as 'command'
+
+Testing Input: 'list files'
+✅ PASS: Classified as 'command'
+
+Testing Input: 'create a folder named src'
+✅ PASS: Classified as 'command'
+
+Testing Input: 'hello, who are you?'
+✅ PASS: Classified as 'question'
+
+Testing Input: 'explain how async python works'
+✅ PASS: Classified as 'question'
+
+Testing Input: 'clone the repo and run tests'
+✅ PASS: Classified as 'workflow'

@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
     GOOGLE_API_KEY: Optional[str] = None
-    DEFAULT_LLM_PROVIDER: str = "openai"
+    DEFAULT_LLM_PROVIDER: str = "gemini"
     
     # Database Settings
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/orbit_agent"

@@ -1,7 +1,7 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from src.config import settings
 
-def get_gemini_model(model_name: str = "gemini-1.5-pro", temperature: float = 0):
+def get_gemini_model(model_name: str = "gemini-flash-latest", temperature: float = 0):
     return ChatGoogleGenerativeAI(
         model=model_name,
         temperature=temperature,
