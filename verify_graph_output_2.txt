@@ -1,0 +1,88 @@
+--- Testing Agent Graph (Classify -> Respond) ---
+
+Testing Input: 'What is Docker?'
+✅ Intent Classified: question
+✅ Response: **Docker** is an open-source platform that allows developers to package, ship, and run applications inside lightweight, portable containers.
+
+### Key Concepts:
+*   **Containers:** A container is a standard unit of software that packages up code and all its dependencies (libraries, system tools, settings) so the application runs quickly and reliably from one computing environment to another.
+*   **Images:** These are read-only templates used to create containers. Think of an image as the "blueprint" and the container as the "living instance."
+*   **Portability:** Docker ensures that if an app works on your laptop, it will work in production, regardless of the underlying operating system or infrastructure.
+
+### Why use Docker?
+1.  **Consistency:** Eliminates the "it works on my machine" problem by providing a standardized environment.
+2.  **Efficiency:** Unlike Virtual Machines (VMs), containers share the host system's OS kernel, making them much faster to start and lighter on resources.
+3.  **Isolation:** Multiple containers can run on the same host without interfering with each other, enhancing security and dependency management.
+4.  **Scalability:** You can easily spin up or shut down containers to handle changes in demand.
+
+In short, Docker simplifies the process of managing application lifecycles by allowing you to treat your infrastructure like code.
+
+Testing Input: 'list files in this directory'
+✅ Intent Classified: command
+✅ Response: The current directory is empty.
+
+Testing Input: 'Explain Python decorators'
+✅ Intent Classified: question
+✅ Response: A **Python decorator** is a design pattern that allows you to modify or extend the behavior of a function or class without permanently changing its source code.
+
+Think of a decorator as a "wrapper" that executes code before and after the function it is decorating.
+
+### 1. Basic Syntax
+In Python, decorators are applied using the `@` symbol above a function definition.
+
+```python
+def my_decorator(func):
+    def wrapper():
+        print("Something is happening before the function is called.")
+        func()
+        print("Something is happening after the function is called.")
+    return wrapper
+
+@my_decorator
+def say_hello():
+    print("Hello!")
+
+say_hello()
+```
+
+**Output:**
+```text
+Something is happening before the function is called.
+Hello!
+Something is happening after the function is called.
+```
+
+### 2. How It Works Under the Hood
+The `@my_decorator` syntax is actually "syntactic sugar" for:
+`say_hello = my_decorator(say_hello)`
+
+Because functions in Python are **first-class objects**, they can be passed as arguments to other functions and returned as values.
+
+### 3. Handling Arguments
+To decorate functions that take arguments, use `*args` and `**kwargs` in the wrapper function:
+
+```python
+def logger(func):
+    def wrapper(*args, **kwargs):
+        print(f"Running {func.__name__} with arguments {args}")
+        return func(*args, **kwargs)
+    return wrapper
+
+@logger
+def add(a, b):
+    return a + b
+
+print(add(5, 10))
+```
+
+### 4. Common Use Cases
+Decorators are widely used in Python for:
+*   **Logging:** Tracking when functions are called and with what data.
+*   **Timing:** Measuring how long a function takes to execute.
+*   **Authentication:** Checking if a user is logged in before allowing them to access a specific route (common in web frameworks like Flask/Django).
+*   **Caching/Memoization:** Storing the results of expensive function calls to avoid redundant work.
+
+### Summary
+*   A decorator is a function that takes another function as an argument.
+*   It returns a new function (the "wrapper").
+*   It allows for **cleaner code** by separating core logic from boilerplate tasks like logging or validation.

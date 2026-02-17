@@ -1,15 +1,16 @@
 from langgraph.graph import StateGraph, END, START
-from .state import AgentState
+from src.agent.nodes.classifier import classify_intent
+from src.agent.nodes.responder import respond
+from src.agent.state import AgentState
 
-def build_agent_graph():
-    """Build a minimal Orbit AI agent graph."""
-    
-    workflow = StateGraph(AgentState)
-    
-    # Placeholder for nodes
-    # workflow.add_node("classifier", ...)
-    
-    # Simple flow for now
-    workflow.add_edge(START, END)
-    
-    return workflow.compile()
+workflow = StateGraph(AgentState)
+
+workflow.add_node("classifier", classify_intent)
+workflow.add_node("responder", respond)
+
+workflow.add_edge(START, "classifier")
+workflow.add_edge("classifier", "responder")
+workflow.add_edge("responder", END)
+
+# Create/Compile graph
+app = workflow.compile()
