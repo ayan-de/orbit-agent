@@ -31,8 +31,8 @@
 | 3 | Build Classifier Node — classify user intent | `src/agent/nodes/classifier.py`, `src/agent/prompts/classifier.py` | ✅ |
 | 4 | Build Responder Node — format final response | `src/agent/nodes/responder.py`, `src/agent/prompts/responder.py` | ✅ |
 | 5 | Wire minimal LangGraph (classify → respond) | `src/agent/graph.py`, `src/agent/edges.py` | ✅ |
-| 6 | Build Bridge Client — HTTP to NestJS Bridge | `src/bridge/client.py`, `src/bridge/schemas.py` | ⬜ |
-| 7 | Build Shell Tool — NLP to shell command | `src/tools/shell.py`, `src/tools/base.py` | ⬜ |
+| 6 | Build Bridge Client — HTTP to NestJS Bridge | `src/bridge/client.py`, `src/bridge/schemas.py` | ✅ |
+| 7 | Build Shell Tool — NLP to shell command | `src/tools/shell.py`, `src/tools/base.py` | ✅ |
 | 8 | Build Safety Classifier — block dangerous cmds | `src/utils/safety.py` | ⬜ |
 | 9 | Wire `/agent/invoke` endpoint | `src/api/v1/agent.py` | ⬜ |
 
@@ -241,7 +241,7 @@ User: "fix PROJ-123 and push"
 ## 📊 Total Progress
 
 ```
-Phase 1  ░░░░░░░░░░   5/9   NLP → Shell
+Phase 1  ░░░░░░░░░░   7/9   NLP → Shell
 Phase 2  ░░░░░░░░░░   0/16  Tools + Memory
 Phase 3  ░░░░░░░░░░   0/14  Jira, Git, Email
 Phase 4  ░░░░░░░░░░   0/10  Memory + RAG
@@ -250,5 +250,5 @@ Phase 6  ░░░░░░░░░░   0/12  Testing Suite
 Phase 7  ░░░░░░░░░░   0/11  Documentation & CLI
 Phase 8  ░░░░░░░░░░   0/11  DevOps & CI/CD
 ─────────────────────────────
-Total    ░░░░░░░░░░   5/93  steps
+Total    ░░░░░░░░░░   7/93  steps
 ```
