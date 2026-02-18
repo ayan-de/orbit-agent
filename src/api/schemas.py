@@ -9,4 +9,5 @@ class AgentRequest(BaseModel):
 class AgentResponse(BaseModel):
     messages: List[str]
     intent: str
+    command: str = ""
     status: str

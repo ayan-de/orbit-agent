@@ -10,6 +10,9 @@ class AgentState(TypedDict):
     # Current classification of user intent
     intent: Literal["command", "question", "workflow", "confirmation", "unknown"]
 
+    # Generated shell command (populated by command_generator)
+    command: str
+
     # Multi-step plan (list of planned actions)
     plan: List[Dict[str, Any]]
     current_step: int

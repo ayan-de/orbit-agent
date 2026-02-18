@@ -16,6 +16,7 @@ async def invoke_agent(request: AgentRequest):
         initial_state = {
             "messages": [HumanMessage(content=request.message)],
             "intent": "unknown",
+            "command": "",
             "plan": [],
             "current_step": 0,
             "tool_results": [],
@@ -29,15 +30,17 @@ async def invoke_agent(request: AgentRequest):
         
         # Invoke the graph
         final_state = await agent_app.ainvoke(initial_state)
-        
+
         # Extract response
         messages = final_state.get("messages", [])
         last_message = messages[-1].content if messages else ""
         intent = final_state.get("intent", "unknown")
-        
+        command = final_state.get("command", "")
+
         return AgentResponse(
             messages=[str(last_message)],
             intent=intent,
+            command=command,
             status="success"
         )
         
