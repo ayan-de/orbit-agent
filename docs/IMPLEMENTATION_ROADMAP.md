@@ -56,7 +56,7 @@ User Message
 |------|------|---------|--------|
 | 1 | Create DB models (agent_sessions, agent_messages, agent_tool_calls) | `src/db/models.py` | ✅ |
 | 2 | Set up Alembic migrations | `alembic.ini`, `migrations/env.py`, `migrations/versions/001_initial_schema.py` | ✅ |
-| 3 | Build session repository | `src/db/repositories/session_repo.py` | ⬜ |
+| 3 | Build session repository | `src/db/repositories/session_repo.py` | ✅ |
 | 4 | Build message repository | `src/db/repositories/message_repo.py` | ⬜ |
 | 5 | Build tool call repository | `src/db/repositories/tool_call_repo.py` | ⬜ |
 | 6 | Build Tool Registry — auto-discover & register tools | `src/tools/registry.py` | ⬜ |
@@ -239,16 +239,13 @@ User: "fix PROJ-123 and push"
 ---
 
 ## 📊 Total Progress
-
-```
 Phase 1  █████████████   9/9   NLP → Shell
-Phase 2  ██░░░░░░░   2/16  Tools + Memory
+Phase 2  ███░░░░░░░   3/16  Tools + Memory
 Phase 3  ░░░░░░░░░   0/14  Jira, Git, Email
 Phase 4  ░░░░░░░░░   0/10  Memory + RAG
 Phase 5  ░░░░░░░░   0/10  Autonomous Workflows
-Phase 6  ░░░░░░░░░   0/12  Testing Suite
-Phase 7  ░░░░░░░░░   0/11  Documentation & CLI
-Phase 8  ░░░░░░░░░   0/11  DevOps & CI/CD
+Phase 6  ░░░░░░░░   0/12  Testing Suite
+Phase 7  ░░░░░░░░   0/11  Documentation & CLI
+Phase 8  ░░░░░░░░   0/11  DevOps & CI/CD
 ─────────────────────────────
-Total    ██░░░░░░░   11/93  steps
-```
+Total    ██░░░░░░░   12/93  steps
