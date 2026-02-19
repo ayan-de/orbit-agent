@@ -21,6 +21,7 @@ from src.db.models import (
 )
 from src.db.repositories.session_repo import SessionRepository
 from src.db.repositories.message_repo import MessageRepository
+from src.db.repositories.tool_call_repo import ToolCallRepository
 from src.db.engine import engine, async_session, get_db, init_db
 
 __all__ = [
@@ -43,6 +44,7 @@ __all__ = [
     # Repositories
     "SessionRepository",
     "MessageRepository",
+    "ToolCallRepository",
     # Engine/Session
     "engine",
     "async_session",

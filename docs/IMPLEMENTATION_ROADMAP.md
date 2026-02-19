@@ -58,7 +58,7 @@ User Message
 | 2 | Set up Alembic migrations | `alembic.ini`, `migrations/env.py`, `migrations/versions/001_initial_schema.py` | ✅ |
 | 3 | Build session repository | `src/db/repositories/session_repo.py` | ✅ |
 | 4 | Build message repository | `src/db/repositories/message_repo.py` | ✅ |
-| 5 | Build tool call repository | `src/db/repositories/tool_call_repo.py` | ⬜ |
+| 5 | Build tool call repository | `src/db/repositories/tool_call_repo.py` | ✅ |
 | 6 | Build Tool Registry — auto-discover & register tools | `src/tools/registry.py` | ⬜ |
 | 7 | Build File Operations tool | `src/tools/file_ops.py` | ⬜ |
 | 8 | Build Planner Node — multi-step planning | `src/agent/nodes/planner.py`, `src/agent/prompts/planner.py` | ⬜ |
@@ -240,7 +240,7 @@ User: "fix PROJ-123 and push"
 
 ## 📊 Total Progress
 Phase 1  █████████████   9/9   NLP → Shell
-Phase 2  ████░░░░░░   4/16  Tools + Memory
+Phase 2  █████░░░░░   5/16  Tools + Memory
 Phase 3  ░░░░░░░░░   0/14  Jira, Git, Email
 Phase 4  ░░░░░░░░░   0/10  Memory + RAG
 Phase 5  ░░░░░░░░   0/10  Autonomous Workflows
@@ -248,4 +248,4 @@ Phase 6  ░░░░░░░░   0/12  Testing Suite
 Phase 7  ░░░░░░░░   0/11  Documentation & CLI
 Phase 8  ░░░░░░░░   0/11  DevOps & CI/CD
 ─────────────────────────────
-Total    ██░░░░░░   13/93  steps
+Total    ███░░░░░░   14/93  steps
