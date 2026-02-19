@@ -59,7 +59,7 @@ User Message
 | 3 | Build session repository | `src/db/repositories/session_repo.py` | ✅ |
 | 4 | Build message repository | `src/db/repositories/message_repo.py` | ✅ |
 | 5 | Build tool call repository | `src/db/repositories/tool_call_repo.py` | ✅ |
-| 6 | Build Tool Registry — auto-discover & register tools | `src/tools/registry.py` | ⬜ |
+| 6 | Build Tool Registry — auto-discover & register tools | `src/tools/registry.py`, `src/tools/base.py` | ✅ |
 | 7 | Build File Operations tool | `src/tools/file_ops.py` | ⬜ |
 | 8 | Build Planner Node — multi-step planning | `src/agent/nodes/planner.py`, `src/agent/prompts/planner.py` | ⬜ |
 | 9 | Build Executor Node — generic tool executor | `src/agent/nodes/executor.py` | ⬜ |
@@ -237,3 +237,18 @@ User: "fix PROJ-123 and push"
 | 11 | Set up deployment to production environment | Documentation + scripts | ⬜ |
 
 ---
+
+## 📊 Total Progress
+
+\`\`\`
+Phase 1  █████████████   9/9   NLP → Shell
+Phase 2  ██████░░░░░   6/16  Tools + Memory
+Phase 3  ░░░░░░░░░   0/14  Jira, Git, Email
+Phase 4  ░░░░░░░░░   0/10  Memory + RAG
+Phase 5  ░░░░░░░░   0/10  Autonomous Workflows
+Phase 6  ░░░░░░░░   0/12  Testing Suite
+Phase 7  ░░░░░░░░   0/11  Documentation & CLI
+Phase 8  ░░░░░░░░   0/11  DevOps & CI/CD
+─────────────────────────────
+Total    ███░░░░░░   15/93  steps
+\`\`\`
