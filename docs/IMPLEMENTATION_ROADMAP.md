@@ -61,7 +61,7 @@ User Message
 | 5 | Build tool call repository | `src/db/repositories/tool_call_repo.py` | ✅ |
 | 6 | Build Tool Registry — auto-discover & register tools | `src/tools/registry.py`, `src/tools/base.py` | ✅ |
 | 7 | Build File Operations tool | `src/tools/file_ops.py` | ✅ |
-| 8 | Build Planner Node — multi-step planning | `src/agent/nodes/planner.py`, `src/agent/prompts/planner.py` | ⬜ |
+| 8 | Build Planner Node — multi-step planning | `src/agent/nodes/planner.py`, `src/agent/prompts/planner.py` | ✅ |
 | 9 | Build Executor Node — generic tool executor | `src/agent/nodes/executor.py` | ⬜ |
 | 10 | Build Evaluator Node — evaluate results, re-plan | `src/agent/nodes/evaluator.py` | ⬜ |
 | 11 | Wire full StateGraph with conditional edges | `src/agent/graph.py`, `src/agent/edges.py` | ⬜ |
@@ -242,7 +242,7 @@ User: "fix PROJ-123 and push"
 
 \`\`\`
 Phase 1  █████████████   9/9   NLP → Shell
-Phase 2  ████████░░░   7/16  Tools + Memory
+Phase 2  █████████░░░   8/16  Tools + Memory
 Phase 3  ░░░░░░░░░   0/14  Jira, Git, Email
 Phase 4  ░░░░░░░░░   0/10  Memory + RAG
 Phase 5  ░░░░░░░░   0/10  Autonomous Workflows
@@ -250,5 +250,5 @@ Phase 6  ░░░░░░░░   0/12  Testing Suite
 Phase 7  ░░░░░░░░   0/11  Documentation & CLI
 Phase 8  ░░░░░░░░   0/11  DevOps & CI/CD
 ─────────────────────────────
-Total    ████░░░░░   16/93  steps
+Total    ███░░░░░░   17/93  steps
 \`\`\`
