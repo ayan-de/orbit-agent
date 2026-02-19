@@ -5,6 +5,7 @@ This module defines all SQLAlchemy ORM models for the application.
 """
 
 from datetime import datetime
+from enum import Enum
 from typing import Optional, List, Any
 from uuid import uuid4
 
@@ -18,14 +19,14 @@ from src.db.base import Base
 
 
 # Enums for status fields
-class SessionStatus(str, SQLEnum):
+class SessionStatus(str, Enum):
     """Status for sessions."""
     ACTIVE = "active"
     ARCHIVED = "archived"
     DELETED = "deleted"
 
 
-class MessageRole(str, SQLEnum):
+class MessageRole(str, Enum):
     """Role for messages."""
     USER = "user"
     ASSISTANT = "assistant"
@@ -33,7 +34,7 @@ class MessageRole(str, SQLEnum):
     TOOL = "tool"
 
 
-class ToolCallStatus(str, SQLEnum):
+class ToolCallStatus(str, Enum):
     """Status for tool calls."""
     PENDING = "pending"
     RUNNING = "running"
@@ -41,7 +42,7 @@ class ToolCallStatus(str, SQLEnum):
     FAILED = "failed"
 
 
-class WorkflowStatus(str, SQLEnum):
+class WorkflowStatus(str, Enum):
     """Status for workflow executions."""
     PENDING = "pending"
     RUNNING = "running"
@@ -50,7 +51,7 @@ class WorkflowStatus(str, SQLEnum):
     CANCELLED = "cancelled"
 
 
-class WorkflowStepStatus(str, SQLEnum):
+class WorkflowStepStatus(str, Enum):
     """Status for workflow steps."""
     PENDING = "pending"
     RUNNING = "running"
@@ -70,18 +71,18 @@ class Session(Base):
     A session contains multiple messages and tracks the overall state
     of a conversation between a user and the agent.
     """
-    __tablename__ = "sessions"
+    __tablename__ = "agent_sessions"
 
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[SessionStatus] = mapped_column(
-        SQLEnum(SessionStatus),
+        SQLEnum(SessionStatus, name="agentsessionstatus"),
         default=SessionStatus.ACTIVE,
         nullable=False,
         index=True
     )
-    metadata: Mapped[dict] = mapped_column(JSONB, default=dict)
+    meta: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -131,7 +132,7 @@ class Message(Base):
 
     Messages can be from the user, assistant, system, or tool outputs.
     """
-    __tablename__ = "messages"
+    __tablename__ = "agent_messages"
 
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     session_id: Mapped[UUID] = mapped_column(
@@ -141,11 +142,11 @@ class Message(Base):
         index=True
     )
     role: Mapped[MessageRole] = mapped_column(
-        SQLEnum(MessageRole),
+        SQLEnum(MessageRole, name="agentmessagerole"),
         nullable=False
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    metadata: Mapped[dict] = mapped_column(JSONB, default=dict)
+    meta: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -179,7 +180,7 @@ class ToolCall(Base):
 
     Tracks tool name, inputs, outputs, status, and execution time.
     """
-    __tablename__ = "tool_calls"
+    __tablename__ = "agent_tool_calls"
 
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     message_id: Mapped[Optional[UUID]] = mapped_column(
@@ -198,7 +199,7 @@ class ToolCall(Base):
     outputs: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[ToolCallStatus] = mapped_column(
-        SQLEnum(ToolCallStatus),
+        SQLEnum(ToolCallStatus, name="agenttoolcallstatus"),
         nullable=False,
         index=True
     )
@@ -265,7 +266,7 @@ class Embedding(Base):
     Used for RAG (Retrieval-Augmented Generation) to find relevant
     context based on vector similarity.
     """
-    __tablename__ = "embeddings"
+    __tablename__ = "agent_embeddings"
 
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     session_id: Mapped[Optional[UUID]] = mapped_column(
@@ -277,7 +278,7 @@ class Embedding(Base):
     entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
     entity_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    metadata: Mapped[dict] = mapped_column(JSONB, default=dict)
+    meta: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
     # embedding column will be added in a separate migration with pgvector extension
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -308,7 +309,7 @@ class WorkflowExecution(Base):
     Tracks the execution of multi-step workflows including status,
     current step, and results.
     """
-    __tablename__ = "workflow_executions"
+    __tablename__ = "agent_workflow_executions"
 
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     session_id: Mapped[UUID] = mapped_column(
@@ -319,7 +320,7 @@ class WorkflowExecution(Base):
     )
     workflow_name: Mapped[str] = mapped_column(String(100), nullable=False)
     status: Mapped[WorkflowStatus] = mapped_column(
-        SQLEnum(WorkflowStatus),
+        SQLEnum(WorkflowStatus, name="agentworkflowstatus"),
         default=WorkflowStatus.PENDING,
         nullable=False,
         index=True
@@ -335,7 +336,7 @@ class WorkflowExecution(Base):
         index=True
     )
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    metadata: Mapped[dict] = mapped_column(JSONB, default=dict)
+    meta: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
 
     # Relationships
     session: Mapped["Session"] = relationship("Session", back_populates="workflow_executions")
@@ -356,7 +357,7 @@ class WorkflowStep(Base):
 
     Each step tracks its own status, inputs, outputs, and execution time.
     """
-    __tablename__ = "workflow_steps"
+    __tablename__ = "agent_workflow_steps"
 
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     workflow_execution_id: Mapped[UUID] = mapped_column(
@@ -367,7 +368,7 @@ class WorkflowStep(Base):
     step_name: Mapped[str] = mapped_column(String(100), nullable=False)
     step_order: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[WorkflowStepStatus] = mapped_column(
-        SQLEnum(WorkflowStepStatus),
+        SQLEnum(WorkflowStepStatus, name="agentworkflowstepstatus"),
         default=WorkflowStepStatus.PENDING,
         nullable=False
     )

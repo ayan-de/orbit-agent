@@ -23,23 +23,23 @@ def upgrade() -> None:
     # Enable pgvector extension
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
-    # Add vector column to embeddings table
+    # Add vector column to agent_embeddings table
     # Default dimension is 1536 for OpenAI text-embedding-ada-002
-    op.execute("ALTER TABLE embeddings ADD COLUMN embedding vector(1536)")
+    op.execute("ALTER TABLE agent_embeddings ADD COLUMN embedding vector(1536)")
 
     # Create HNSW index for fast approximate vector search
     # Uses cosine distance (vector_cosine_ops) which is common for semantic search
     op.execute("""
-        CREATE INDEX idx_embeddings_hnsw ON embeddings
+        CREATE INDEX idx_agent_embeddings_hnsw ON agent_embeddings
         USING hnsw (embedding vector_cosine_ops)
         WITH (m = 16, ef_construction = 64)
     """)
 
     # Add GIN index for metadata JSONB queries
-    op.execute("CREATE INDEX idx_embeddings_metadata ON embeddings USING GIN (metadata)")
+    op.execute("CREATE INDEX idx_agent_embeddings_metadata ON agent_embeddings USING GIN (metadata)")
 
     # Add index for session_id (already exists, but ensuring it's there for vector queries with filtering)
-    op.execute("CREATE INDEX IF NOT EXISTS idx_embeddings_session ON embeddings (session_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_agent_embeddings_session ON agent_embeddings (session_id)")
 
 
 def downgrade() -> None:
