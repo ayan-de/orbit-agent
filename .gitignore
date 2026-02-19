@@ -1,7 +1,28 @@
+# Environment
 .env
+.env.local
+
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 venv/
-*.pyc
+env/
+ENV/
+
+# Package metadata
+*.egg-info/
+dist/
+build/
+*.egg
+
+# IDE
 .DS_Store
 .idea/
 .vscode/
+
+# Alembic
+*.db
+*.sqlite
