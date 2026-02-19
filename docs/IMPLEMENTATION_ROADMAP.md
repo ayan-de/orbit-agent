@@ -67,7 +67,7 @@ User Message
 | 11 | Wire full StateGraph with conditional edges | `src/agent/graph.py`, `src/agent/edges.py` | ✅ |
 | 12 | Build PostgreSQL Checkpointer (pause/resume) | `src/memory/checkpointer.py` | ✅ |
 | 13 | Build Conversation Memory service | `src/memory/conversation.py` | ✅ |
-| 14 | Add WebSocket streaming endpoint | `src/api/v1/agent.py` (WS `/agent/stream`) | ⬜ |
+| 14 | Add WebSocket streaming endpoint | `src/api/v1/agent.py` (WS `/agent/stream`) | ✅ |
 | 15 | Build Sessions CRUD endpoint | `src/api/v1/sessions.py` | ⬜ |
 | 16 | Set up Docker Compose (agent + postgres + redis) | `docker-compose.yml`, `Dockerfile` | ⬜ |
 
