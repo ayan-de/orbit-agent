@@ -24,6 +24,7 @@ class AgentState(TypedDict):
     needs_confirmation: bool
     confirmation_prompt: Optional[str]
     is_complete: bool
+    evaluation_outcome: Optional[Literal["goal_achieved", "continue_execution", "needs_replanning", "fatal_error", "incomplete"]]
 
     # Metadata
     session_id: str
