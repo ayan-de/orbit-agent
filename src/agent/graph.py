@@ -4,7 +4,7 @@ LangGraph workflow definition for Orbit AI Agent.
 Defines the complete state graph with nodes and conditional edges.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from langgraph.graph import StateGraph, END, START
 from src.agent.nodes.classifier import classify_intent
 from src.agent.nodes.command_generator import generate_command
@@ -19,6 +19,7 @@ from src.agent.edges import (
     route_after_executor,
     route_after_evaluator
 )
+from src.memory import get_checkpointer
 
 # Initialize nodes
 planner_node = PlannerNode()
@@ -168,8 +169,8 @@ workflow.add_conditional_edges(
 # responder → END
 workflow.add_edge("responder", END)
 
-# Compile the graph
-app = workflow.compile()
+# Compile graph (checkpointer attached at runtime)
+app = workflow.compile(checkpointer=None)
 
 
 def get_graph():
@@ -180,6 +181,23 @@ def get_graph():
         Compiled LangGraph app
     """
     return app
+
+
+async def get_compiled_graph(with_checkpointer: bool = True):
+    """
+    Get a compiled graph with optional checkpointer.
+
+    Args:
+        with_checkpointer: Whether to use PostgreSQL checkpointer
+
+    Returns:
+        Compiled LangGraph app
+    """
+    checkpointer = None
+    if with_checkpointer:
+        checkpointer = await get_checkpointer()
+
+    return workflow.compile(checkpointer=checkpointer)
 
 
 def get_workflow():

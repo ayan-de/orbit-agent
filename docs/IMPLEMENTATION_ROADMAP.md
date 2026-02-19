@@ -65,7 +65,7 @@ User Message
 | 9 | Build Executor Node — generic tool executor | `src/agent/nodes/executor.py` | ✅ |
 | 10 | Build Evaluator Node — evaluate results, re-plan | `src/agent/nodes/evaluator.py` | ✅ |
 | 11 | Wire full StateGraph with conditional edges | `src/agent/graph.py`, `src/agent/edges.py` | ✅ |
-| 12 | Build PostgreSQL Checkpointer (pause/resume) | `src/memory/checkpointer.py` | ⬜ |
+| 12 | Build PostgreSQL Checkpointer (pause/resume) | `src/memory/checkpointer.py` | ✅ |
 | 13 | Build Conversation Memory service | `src/memory/conversation.py` | ⬜ |
 | 14 | Add WebSocket streaming endpoint | `src/api/v1/agent.py` (WS `/agent/stream`) | ⬜ |
 | 15 | Build Sessions CRUD endpoint | `src/api/v1/sessions.py` | ⬜ |
