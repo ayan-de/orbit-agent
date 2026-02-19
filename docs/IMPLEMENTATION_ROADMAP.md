@@ -237,15 +237,3 @@ User: "fix PROJ-123 and push"
 | 11 | Set up deployment to production environment | Documentation + scripts | ⬜ |
 
 ---
-
-## 📊 Total Progress
-Phase 1  █████████████   9/9   NLP → Shell
-Phase 2  █████░░░░░   5/16  Tools + Memory
-Phase 3  ░░░░░░░░░   0/14  Jira, Git, Email
-Phase 4  ░░░░░░░░░   0/10  Memory + RAG
-Phase 5  ░░░░░░░░   0/10  Autonomous Workflows
-Phase 6  ░░░░░░░░   0/12  Testing Suite
-Phase 7  ░░░░░░░░   0/11  Documentation & CLI
-Phase 8  ░░░░░░░░   0/11  DevOps & CI/CD
-─────────────────────────────
-Total    ███░░░░░░   14/93  steps
