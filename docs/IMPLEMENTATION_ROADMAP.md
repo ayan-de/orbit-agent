@@ -54,8 +54,8 @@ User Message
 
 | Step | Task | File(s) | Status |
 |------|------|---------|--------|
-| 1 | Create DB models (sessions, messages, tool_calls) | `src/db/models.py` | ⬜ |
-| 2 | Set up Alembic migrations | `alembic.ini`, `migrations/env.py`, `migrations/versions/001_initial_schema.py` | ⬜ |
+| 1 | Create DB models (agent_sessions, agent_messages, agent_tool_calls) | `src/db/models.py` | ✅ |
+| 2 | Set up Alembic migrations | `alembic.ini`, `migrations/env.py`, `migrations/versions/001_initial_schema.py` | ✅ |
 | 3 | Build session repository | `src/db/repositories/session_repo.py` | ⬜ |
 | 4 | Build message repository | `src/db/repositories/message_repo.py` | ⬜ |
 | 5 | Build tool call repository | `src/db/repositories/tool_call_repo.py` | ⬜ |
