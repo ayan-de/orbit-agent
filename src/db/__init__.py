@@ -20,6 +20,7 @@ from src.db.models import (
     WorkflowStepStatus,
 )
 from src.db.repositories.session_repo import SessionRepository
+from src.db.repositories.message_repo import MessageRepository
 from src.db.engine import engine, async_session, get_db, init_db
 
 __all__ = [
@@ -41,6 +42,7 @@ __all__ = [
     "WorkflowStepStatus",
     # Repositories
     "SessionRepository",
+    "MessageRepository",
     # Engine/Session
     "engine",
     "async_session",
