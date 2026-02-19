@@ -62,7 +62,7 @@ User Message
 | 6 | Build Tool Registry — auto-discover & register tools | `src/tools/registry.py`, `src/tools/base.py` | ✅ |
 | 7 | Build File Operations tool | `src/tools/file_ops.py` | ✅ |
 | 8 | Build Planner Node — multi-step planning | `src/agent/nodes/planner.py`, `src/agent/prompts/planner.py` | ✅ |
-| 9 | Build Executor Node — generic tool executor | `src/agent/nodes/executor.py` | ⬜ |
+| 9 | Build Executor Node — generic tool executor | `src/agent/nodes/executor.py` | ✅ |
 | 10 | Build Evaluator Node — evaluate results, re-plan | `src/agent/nodes/evaluator.py` | ⬜ |
 | 11 | Wire full StateGraph with conditional edges | `src/agent/graph.py`, `src/agent/edges.py` | ⬜ |
 | 12 | Build PostgreSQL Checkpointer (pause/resume) | `src/memory/checkpointer.py` | ⬜ |
