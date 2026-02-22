@@ -4,16 +4,18 @@ Planner node for multi-step workflow planning.
 Breaks down complex tasks into smaller, executable steps.
 """
 
+import json
+import logging
 from typing import List, Dict, Any, Optional
-from enum import Enum
 
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
-from langchain_openai import ChatOpenAI
 
 from src.agent.state import AgentState
 from src.llm.factory import llm_factory
 from src.tools import get_tool_registry
 from src.tools.base import ToolCategory, ToolError
+
+logger = logging.getLogger("orbit.planner")
 
 
 class PlanStep:
@@ -23,20 +25,10 @@ class PlanStep:
         self,
         step_number: int,
         description: str,
+        expected_outcome: str,
         tool_name: Optional[str] = None,
         arguments: Optional[Dict[str, Any]] = None,
-        expected_outcome: str
     ):
-        """
-        Initialize a plan step.
-
-        Args:
-            step_number: Step number in the plan
-            description: What this step does
-            tool_name: Name of tool to use (if any)
-            arguments: Tool arguments (if tool is used)
-            expected_outcome: Expected result
-        """
         self.step_number = step_number
         self.description = description
         self.tool_name = tool_name
@@ -45,50 +37,25 @@ class PlanStep:
 
 
 class Plan:
-    """
-    Represents a complete execution plan.
-
-    Contains multiple steps and overall metadata.
-    """
+    """Represents a complete execution plan."""
 
     def __init__(
         self,
         steps: List[PlanStep],
         goal: str,
         estimated_steps: Optional[int] = None,
-        requires_confirmation: bool = False
+        requires_confirmation: bool = False,
     ):
-        """
-        Initialize a plan.
-
-        Args:
-            steps: List of steps in the plan
-            goal: Overall goal of the plan
-            estimated_steps: Estimated number of steps (optional)
-            requires_confirmation: Whether the plan needs user approval
-        """
         self.steps = steps
         self.goal = goal
         self.estimated_steps = estimated_steps
         self.requires_confirmation = requires_confirmation
 
     def add_step(self, step: PlanStep) -> None:
-        """
-        Add a step to the plan.
-
-        Args:
-            step: PlanStep to add
-        """
         self.steps.append(step)
         self.estimated_steps = len(self.steps)
 
     def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert plan to dictionary.
-
-        Returns:
-            Dictionary representation of the plan
-        """
         return {
             "goal": self.goal,
             "steps": [step.__dict__ for step in self.steps],
@@ -98,84 +65,71 @@ class Plan:
 
 
 class PlannerNode:
-    """
-    Planner node for LangGraph workflow.
-
-    Breaks down complex user requests into executable steps.
-    """
+    """Planner node for LangGraph workflow."""
 
     def __init__(self, llm_factory=llm_factory):
-        """
-        Initialize planner node.
-
-        Args:
-            llm_factory: Factory function for creating LLM instances
-        """
         self.llm_factory = llm_factory
+        self._tool_registry = None
+
+    def _get_registry(self):
+        """Get tool registry lazily."""
+        if self._tool_registry is None:
+            self._tool_registry = get_tool_registry()
+        return self._tool_registry
 
     def _get_llm(self, temperature: float = 0.3):
-        """
-        Get LLM instance with specified temperature.
-
-        Args:
-            temperature: Temperature for creativity vs consistency
-
-        Returns:
-            ChatOpenAI instance
-        """
         return self.llm_factory(temperature=temperature)
 
-    async def create_plan(
-        self,
-        state: AgentState,
-        max_steps: int = 5
-    ) -> Plan:
-        """
-        Create an execution plan from user's request.
+    def _validate_tool_name(self, tool_name: Optional[str]) -> Optional[str]:
+        """Validate that a tool name exists in the registry."""
+        if not tool_name:
+            return None
 
-        Args:
-            state: Current agent state containing messages
-            max_steps: Maximum number of steps in the plan
+        registry = self._get_registry()
+        if registry.tool_exists(tool_name):
+            return tool_name
 
-        Returns:
-            Plan object with steps to execute
-        """
-        # Get last user message
+        logger.warning(f"Invalid tool name: {tool_name}")
+        return None
+
+    def _get_available_tools_description(self) -> str:
+        """Get formatted description of available tools."""
+        registry = self._get_registry()
+        tool_names = registry.get_tool_names()
+
+        descriptions = []
+        for name in tool_names:
+            tool = registry.get_tool(name)
+            if tool:
+                descriptions.append(f"  - {name}: {tool.description}")
+
+        return "\n".join(descriptions)
+
+    async def create_plan(self, state: AgentState, max_steps: int = 5) -> Plan:
+        """Create an execution plan from user's request."""
         if not state["messages"]:
-            return Plan(
-                steps=[],
-                goal="No user message to plan for"
-            )
+            return Plan(steps=[], goal="No user message to plan for")
 
         last_message = state["messages"][-1]
-        if last_message["role"] != "user":
-            # Only plan for user requests
-            return Plan(
-                steps=[],
-                goal="Planning only available for user requests"
+        if not isinstance(last_message, HumanMessage):
+            return Plan(steps=[], goal="Planning only available for user requests")
+
+        user_request = last_message.content
+        if isinstance(user_request, list):
+            user_request = " ".join(
+                str(part.get("text", part)) if isinstance(part, dict) else str(part)
+                for part in user_request
             )
 
-        user_request = last_message["content"]
+        logger.info(f"Creating plan for: {user_request[:100]}...")
 
-        # Check if this is a simple single-step task
-        if await self._is_single_step(state, user_request):
-            return await self._create_simple_plan(user_request)
+        if await self._is_single_step(state, str(user_request)):
+            return await self._create_simple_plan(str(user_request), max_steps)
 
-        # Otherwise, create multi-step plan
-        return await self._create_multi_step_plan(state, user_request, max_steps)
+        return await self._create_multi_step_plan(state, str(user_request), max_steps)
 
     async def _is_single_step(self, state: AgentState, user_request: str) -> bool:
-        """
-        Determine if the request is a simple single-step task.
-
-        Args:
-            state: Agent state
-            user_request: User's request
-
-        Returns:
-            True if single-step, False otherwise
-        """
-        # Check if request matches a simple pattern
+        """Determine if the request is a simple single-step task."""
         simple_patterns = [
             "what is my",
             "list ",
@@ -193,320 +147,217 @@ class PlannerNode:
 
         return False
 
-    async def _create_simple_plan(self, user_request: str) -> Plan:
-        """
-        Create a simple one-step plan.
-
-        Args:
-            user_request: User's request
-
-        Returns:
-            Plan with one step
-        """
+    async def _create_simple_plan(self, user_request: str, max_steps: int = 3) -> Plan:
+        """Create a simple plan (1-2 steps)."""
         llm = self._get_llm(temperature=0.2)
+        tools_description = self._get_available_tools_description()
+        tool_names = self._get_registry().get_tool_names()
 
-        # Use available tools to see if any tool is needed
-        registry = get_tool_registry()
-        available_tools = registry.format_tools_for_llm()
-
-        system_prompt = f"""You are an AI assistant. Your task is to create a simple execution plan for the user's request.
+        system_prompt = f"""You are an AI assistant. Create a simple execution plan for the user's request.
 
 User request: "{user_request}"
 
-Analyze the request and create a concise, actionable plan with at most {max_steps} steps.
-
 Available tools:
-{available_tools}
+{tools_description}
+
+IMPORTANT: Only use tool_name values from this exact list: {tool_names}
+
+Output a JSON object with this structure:
+{{
+  "goal": "Description of what we're trying to accomplish",
+  "steps": [
+    {{
+      "step_number": 1,
+      "description": "Clear description of this step",
+      "tool_name": "exact_tool_name_from_list_or_null",
+      "arguments": {{"arg1": "value1"}} or null,
+      "expected_outcome": "What should happen"
+    }}
+  ],
+  "requires_confirmation": false
+}}
 
 Guidelines:
-- Break down complex tasks into multiple clear steps
-- Each step should be specific and executable
-- Only use tools that are explicitly requested or clearly needed
-- Focus on the user's goal, don't over-plan
-
-Output format:
-A single step with:
-- step_number (1)
-- description: Clear, actionable description
-- tool_name: Name of tool to use (if applicable, otherwise null)
-- arguments: Tool arguments as JSON object (if tool is used, otherwise null)
-- expected_outcome: Expected result
-
-Respond with ONLY a valid JSON object. No other text."""
-
-        response = await llm.ainvoke([HumanMessage(content=system_prompt)])
+- Use tool_name ONLY if a tool from the list is needed
+- If no tool is needed, set tool_name to null
+- Keep it simple - maximum {max_steps} steps
+- Respond with ONLY valid JSON, no other text"""
 
         try:
-            # Parse LLM response as JSON
+            response = await llm.ainvoke([HumanMessage(content=system_prompt)])
             plan_data = self._parse_llm_plan_response(response.content)
 
-            # Create Plan object
-            steps = []
-            for i, step_data in enumerate(plan_data.get("steps", []), start=1):
-                step = PlanStep(
-                    step_number=i,
-                    description=step_data["description"],
-                    tool_name=step_data.get("tool_name"),
-                    arguments=step_data.get("arguments"),
-                    expected_outcome=step_data.get("expected_outcome")
-                )
-                steps.append(step)
+            steps = self._create_validated_steps(plan_data)
 
             return Plan(
                 steps=steps,
                 goal=plan_data.get("goal", user_request),
-                estimated_steps=plan_data.get("steps_count", len(steps)),
-                requires_confirmation=plan_data.get("requires_confirmation", False)
+                estimated_steps=len(steps),
+                requires_confirmation=plan_data.get("requires_confirmation", False),
             )
 
         except Exception as e:
-            # Fallback: single step with error handling
-            return Plan(
-                steps=[
-                    PlanStep(
-                        step_number=1,
-                        description=f"Process: {user_request}",
-                        tool_name=None,
-                        expected_outcome="Understand and respond to user"
-                    )
-                ],
-                goal=user_request
-            )
+            logger.error(f"Simple plan creation failed: {e}")
+            return self._create_fallback_plan(user_request)
 
     async def _create_multi_step_plan(
-        self,
-        state: AgentState,
-        user_request: str,
-        max_steps: int
+        self, state: AgentState, user_request: str, max_steps: int
     ) -> Plan:
-        """
-        Create a multi-step plan for complex tasks.
-
-        Args:
-            state: Agent state
-            user_request: User's request
-            max_steps: Maximum number of steps
-
-        Returns:
-            Plan with multiple steps
-        """
-        llm = self._get_llm(temperature=0.5)
-
-        # Get conversation context
-        context_messages = self._format_messages_for_llm(state["messages"][-10:])  # Last 10 messages
-
-        # Get available tools
-        registry = get_tool_registry()
-        available_tools = registry.format_tools_for_llm()
+        """Create a multi-step plan for complex tasks."""
+        llm = self._get_llm(temperature=0.3)
+        tools_description = self._get_available_tools_description()
+        tool_names = self._get_registry().get_tool_names()
 
         system_prompt = f"""You are an AI assistant that creates execution plans.
 
-Your task is to break down the user's request into clear, executable steps.
-
 User request: "{user_request}"
 
-Recent conversation context (last 10 messages):
-{self._format_messages_for_llm(state["messages"][-10:])}
-
 Available tools:
-{available_tools}
+{tools_description}
+
+IMPORTANT: Only use tool_name values from this exact list: {tool_names}
+
+Output a JSON object with this structure:
+{{
+  "goal": "Description of overall goal",
+  "steps": [
+    {{
+      "step_number": 1,
+      "description": "Create the directory 'wow'",
+      "tool_name": "create_directory",
+      "arguments": {{"path": "wow"}},
+      "expected_outcome": "Directory 'wow' is created"
+    }},
+    {{
+      "step_number": 2,
+      "description": "Create file ayan.txt inside wow directory",
+      "tool_name": "write_file",
+      "arguments": {{"path": "wow/ayan.txt", "content": ""}},
+      "expected_outcome": "File 'wow/ayan.txt' is created"
+    }}
+  ],
+  "requires_confirmation": false
+}}
 
 Guidelines:
-1. Analyze what the user wants to accomplish
-2. Break it down into {max_steps} clear, sequential steps
-3. Each step should be:
-   - Specific and actionable
-   - Build on previous steps
-   - Use available tools when helpful
-4. Only create steps that are necessary for the goal
-5. If a step needs user confirmation, mark requires_confirmation=true
-6. Complex operations should be broken down further
-
-For each step provide:
-- step_number (1, 2, 3, ...)
-- description: Clear, actionable description
-- tool_name: Exact tool name to use (if a tool is needed, otherwise null)
-- arguments: JSON object with parameters for the tool (if tool is used, otherwise null)
-- expected_outcome: What should be the result of this step
-
-Respond with ONLY a valid JSON object. No other text."""
-
-        messages = [HumanMessage(content=system_prompt)] + context_messages
-        response = await llm.ainvoke(messages)
+1. Break down complex tasks into sequential steps
+2. Use tool_name ONLY from the available tools list
+3. If no tool is needed for a step, set tool_name to null
+4. Maximum {max_steps} steps
+5. Each step should build on previous steps
+6. Respond with ONLY valid JSON, no other text"""
 
         try:
-            # Parse LLM response as JSON
+            response = await llm.ainvoke([HumanMessage(content=system_prompt)])
+            logger.debug(f"LLM response: {response.content[:500]}...")
+
             plan_data = self._parse_llm_plan_response(response.content)
+            steps = self._create_validated_steps(plan_data)
 
-            # Create Plan object
-            steps = []
-            for i, step_data in enumerate(plan_data.get("steps", []), start=1):
-                step = PlanStep(
-                    step_number=i,
-                    description=step_data["description"],
-                    tool_name=step_data.get("tool_name"),
-                    arguments=step_data.get("arguments"),
-                    expected_outcome=step_data.get("expected_outcome")
-                )
-                steps.append(step)
+            if not steps:
+                logger.warning("No valid steps created, using fallback")
+                return self._create_fallback_plan(user_request)
 
-            # Check if any step requires confirmation
-            requires_confirmation = any(
-                step.get("tool_name") and not registry.get_tool(step["tool_name"]).is_safe_for_user(1)
-                for step in steps if step.tool_name
-            )
+            registry = self._get_registry()
+            requires_confirmation = False
+            for step in steps:
+                if step.tool_name:
+                    tool = registry.get_tool(step.tool_name)
+                    if tool and tool.requires_confirmation:
+                        requires_confirmation = True
+                        break
 
             return Plan(
                 steps=steps,
                 goal=plan_data.get("goal", user_request),
-                estimated_steps=plan_data.get("steps_count", len(steps)),
-                requires_confirmation=requires_confirmation
+                estimated_steps=len(steps),
+                requires_confirmation=requires_confirmation,
             )
 
         except Exception as e:
-            # Fallback plan: analyze request directly
+            logger.error(f"Multi-step plan creation failed: {e}")
+            return self._create_fallback_plan(user_request)
+
+    def _create_validated_steps(self, plan_data: Dict[str, Any]) -> List[PlanStep]:
+        """Create steps with validated tool names."""
+        steps = []
+        registry = self._get_registry()
+
+        for i, step_data in enumerate(plan_data.get("steps", []), start=1):
+            tool_name = step_data.get("tool_name")
+
+            if tool_name:
+                validated_tool = self._validate_tool_name(tool_name)
+                if not validated_tool:
+                    logger.warning(
+                        f"Step {i}: Invalid tool '{tool_name}', will try shell_exec"
+                    )
+                    if registry.tool_exists("shell_exec"):
+                        tool_name = "shell_exec"
+                        arguments = step_data.get("arguments", {})
+                        if isinstance(arguments, dict) and "command" not in arguments:
+                            arguments = {"command": step_data.get("description", "")}
+                    else:
+                        tool_name = None
+                else:
+                    tool_name = validated_tool
+
+            step = PlanStep(
+                step_number=i,
+                description=step_data.get("description", f"Step {i}"),
+                tool_name=tool_name,
+                arguments=step_data.get("arguments"),
+                expected_outcome=step_data.get("expected_outcome", "Complete step"),
+            )
+            steps.append(step)
+            logger.info(f"Step {i}: tool={tool_name}, desc={step.description[:50]}...")
+
+        return steps
+
+    def _create_fallback_plan(self, user_request: str) -> Plan:
+        """Create a fallback plan using shell_exec."""
+        registry = self._get_registry()
+
+        if registry.tool_exists("shell_exec"):
             return Plan(
                 steps=[
                     PlanStep(
                         step_number=1,
-                        description=f"Analyze and respond to: {user_request}",
-                        tool_name=None,
-                        expected_outcome="Understand and provide information"
+                        description=f"Execute: {user_request}",
+                        tool_name="shell_exec",
+                        arguments={"command": user_request},
+                        expected_outcome="Execute the user's request",
                     )
                 ],
                 goal=user_request,
-                requires_confirmation=False
+                requires_confirmation=True,
             )
 
-    def _format_messages_for_llm(self, messages: List[Dict[str, Any]]) -> List[HumanMessage]:
-        """
-        Format messages for LLM context.
-
-        Args:
-            messages: List of message dictionaries
-
-        Returns:
-            List of HumanMessage instances
-        """
-        formatted = []
-        for msg in messages:
-            if msg["role"] == "user":
-                formatted.append(HumanMessage(content=msg["content"]))
-            elif msg["role"] == "assistant":
-                formatted.append(AIMessage(content=msg["content"]))
-
-        return formatted
+        return Plan(
+            steps=[
+                PlanStep(
+                    step_number=1,
+                    description=f"Respond to: {user_request}",
+                    tool_name=None,
+                    expected_outcome="Provide helpful response",
+                )
+            ],
+            goal=user_request,
+            requires_confirmation=False,
+        )
 
     def _parse_llm_plan_response(self, response: str) -> Dict[str, Any]:
-        """
-        Parse LLM response into plan data.
-
-        Args:
-            response: LLM response string
-
-        Returns:
-            Dictionary with plan data
-        """
-        # Try to extract JSON from response
-        # Handle cases where JSON might be embedded in text
+        """Parse LLM response into plan data."""
         response = response.strip()
 
-        # Try to find JSON structure
-        json_start = response.find('{')
-        json_end = response.rfind('}')
+        json_start = response.find("{")
+        json_end = response.rfind("}")
 
         if json_start != -1 and json_end != -1:
-            json_str = response[json_start:json_end+1]
+            json_str = response[json_start : json_end + 1]
             try:
-                import json
                 return json.loads(json_str)
-            except json.JSONDecodeError:
-                pass
+            except json.JSONDecodeError as e:
+                logger.warning(f"JSON decode error: {e}")
 
-        # Fallback: try to extract from markdown code blocks
-        # This is a simplified parser - could be more sophisticated
-        lines = response.split('\n')
-        in_code_block = False
-        json_lines = []
-
-        for line in lines:
-            if '```json' in line or '```' in line:
-                in_code_block = True
-                continue
-            elif in_code_block and '```' in line:
-                in_code_block = False
-
-            # Try to parse as JSON line by line
-            line = line.strip()
-            if line.startswith('-') or line.startswith('*') or line == '```':
-                continue
-            try:
-                import json
-                parsed = json.loads(line)
-                if isinstance(parsed, dict):
-                    json_lines.append(parsed)
-            except json.JSONDecodeError:
-                pass
-
-        # Combine all JSON objects
-        steps = []
-        goal = None
-        requires_confirmation = False
-
-        for item in json_lines:
-            if isinstance(item, dict):
-                if "steps" in item:
-                    steps.extend(item["steps"])
-                    if "goal" in item:
-                        goal = item["goal"]
-                    if "requires_confirmation" in item:
-                        requires_confirmation = item["requires_confirmation"]
-
-        # If no structured response found, create simple plan from text
-        if not steps:
-            # Try to create steps from numbered lists
-            for item in json_lines:
-                if isinstance(item, list):
-                    steps_data = {
-                        "steps": [
-                            {
-                                "step_number": i+1,
-                                "description": step if isinstance(step, str) else str(step),
-                                "tool_name": None,
-                                "arguments": None,
-                                "expected_outcome": "Complete step"
-                            }
-                            for i, step in enumerate(item, start=1)
-                        ]
-                    }
-                    if not steps:
-                        steps_data = {"steps": steps_data["steps"]}
-                    break
-                elif isinstance(item, str) and item:
-                    # Create single step from string
-                    steps_data = {
-                        "steps": [
-                            {
-                                "step_number": 1,
-                                "description": item,
-                                "tool_name": None,
-                                "arguments": None,
-                                "expected_outcome": "Process request"
-                            }
-                        ]
-                    }
-                    break
-                else:
-                    break
-
-            return {
-                "steps": steps,
-                "goal": goal or "Process the request",
-                "requires_confirmation": requires_confirmation
-            }
-
-        return {
-            "steps": steps,
-            "goal": goal or "Process the request",
-            "requires_confirmation": requires_confirmation
-        }
+        return {"steps": [], "goal": "Parse the request"}

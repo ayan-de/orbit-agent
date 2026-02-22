@@ -3,7 +3,8 @@ from langchain_core.prompts import ChatPromptTemplate
 CLASSIFIER_SYSTEM_PROMPT = """You are an intelligent intent classifier for an AI coding agent named Orbit.
 Your job is to analyze the user's latest request and classify it into one of the following categories:
 
-1. "command": The user wants to execute a specific shell command or a simple file operation.
+1. "command": The user wants to execute a strictly SINGLE, isolated shell command or a SIMPLE file operation.
+   IMPORTANT: If the request contains multiple steps, actions joined by "and", "then", or imply executing chained actions (e.g. "create a folder AND create a file", "mkdir foo && cd foo"), it MUST be classified as a "workflow", NOT a "command".
    Examples:
    - "list files in current directory"
    - "create a new folder named test"
@@ -20,9 +21,10 @@ Your job is to analyze the user's latest request and classify it into one of the
    - "hello"
    - "who are you?"
 
-3. "workflow": The user wants to perform a multi-step task or a complex operation that requires planning.
+3. "workflow": The user wants to perform a multi-step task, a complex operation that requires planning, OR any request that chains multiple actions together using words like "and".
    Examples:
    - "clone the repo, install dependencies, and run the tests"
+   - "create a folder called wow and create a file called ayan.txt inside it"
    - "refactor the auth module to use JWT"
    - "find all unused variables in the src folder and remove them"
 

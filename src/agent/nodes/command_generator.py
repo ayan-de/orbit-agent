@@ -1,4 +1,5 @@
 from typing import Dict, Any
+import re
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -67,13 +68,18 @@ async def generate_command(state: AgentState) -> Dict[str, Any]:
         command = await chain.ainvoke({"user_request": user_request})
         command = command.strip()
 
-        # Clean up any markdown code blocks
-        if command.startswith("```"):
-            command = command.split("\n")[1]  # Remove ``` at start
-        if command.endswith("```"):
-            command = command.rsplit("\n", 1)[0]  # Remove ``` at end
+        # Clean up any markdown code blocks (```bash, ```sh, or just ```)
+        # Match ```language\ncmd\n``` or ```\ncmd\n```
+        code_block_pattern = r'```(?:bash|sh)?\s*\n(.*?)\n```'
+        match = re.search(code_block_pattern, command, re.DOTALL)
+        if match:
+            command = match.group(1).strip()
+        else:
+            # Fallback: just strip backticks if they're at the edges
+            command = command.strip('`')
 
-        command = command.strip()
+        # Strip any remaining leading/trailing whitespace and quotes
+        command = command.strip().strip('"').strip("'")
 
         # Create a message that clearly indicates the command
         response_message = f"Running: `{command}`"

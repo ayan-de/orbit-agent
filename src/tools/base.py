@@ -14,10 +14,11 @@ from pydantic import BaseModel, Field
 
 class ToolCategory(str, Enum):
     """Categories for organizing tools."""
-    SYSTEM = "system"           # Core system operations (shell, files)
+
+    SYSTEM = "system"  # Core system operations (shell, files)
     INTEGRATION = "integration"  # External service integrations (Jira, Git, Email)
-    WORKFLOW = "workflow"       # Workflow-specific operations
-    ANALYSIS = "analysis"        # Data analysis and reporting
+    WORKFLOW = "workflow"  # Workflow-specific operations
+    ANALYSIS = "analysis"  # Data analysis and reporting
 
 
 class ToolInput(BaseModel):
@@ -36,11 +37,17 @@ class ToolError(BaseModel):
     """Structured error information from tool execution."""
 
     tool_name: str = Field(..., description="Name of the tool that failed")
-    error_type: str = Field(..., description="Type of error (e.g., validation, execution, network)")
+    error_type: str = Field(
+        ..., description="Type of error (e.g., validation, execution, network)"
+    )
     error_message: str = Field(..., description="Human-readable error message")
-    details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
+    details: Optional[Dict[str, Any]] = Field(
+        None, description="Additional error details"
+    )
     retryable: bool = Field(True, description="Whether the operation can be retried")
-    suggested_fix: Optional[str] = Field(None, description="Suggested fix for the error")
+    suggested_fix: Optional[str] = Field(
+        None, description="Suggested fix for the error"
+    )
 
 
 class OrbitTool(BaseTool, ABC):
@@ -88,7 +95,7 @@ class OrbitTool(BaseTool, ABC):
             Tuple of (is_valid, error_message)
         """
         try:
-            if hasattr(self, 'args_schema') and self.args_schema:
+            if hasattr(self, "args_schema") and self.args_schema:
                 self.args_schema.model_validate(input_data)
             return True, None
         except Exception as e:
@@ -108,11 +115,26 @@ class OrbitTool(BaseTool, ABC):
         """
         pass
 
-    async def execute(
-        self,
-        *args: Any,
-        **kwargs: Any
-    ) -> str | ToolError:
+    def _run(self, *args: Any, **kwargs: Any) -> str:
+        """
+        Sync execution method (satisfies BaseTool abstract method).
+
+        This is not used since we only call the async version.
+        Subclasses should implement _arun.
+
+        Args:
+            *args: Positional arguments
+            **kwargs: Keyword arguments
+
+        Returns:
+            Tool output as string
+
+        Raises:
+            NotImplementedError: Always - use _arun instead
+        """
+        raise NotImplementedError("OrbitTool only supports async execution via _arun")
+
+    async def execute(self, *args: Any, **kwargs: Any) -> str | ToolError:
         """
         Execute the tool with validation and error handling.
 
@@ -123,10 +145,12 @@ class OrbitTool(BaseTool, ABC):
         Returns:
             Tool output as string, or ToolError on failure
         """
-        # Extract input data if provided
-        input_data = kwargs.get('input_data') if kwargs else None
+        input_data = kwargs.get("input_data") if kwargs else None
 
-        # Validate input
+        if input_data is None and args and isinstance(args[0], dict):
+            input_data = args[0]
+            args = args[1:]
+
         if input_data is not None:
             is_valid, error_message = self.validate_input(input_data)
             if not is_valid:
@@ -134,15 +158,19 @@ class OrbitTool(BaseTool, ABC):
                     tool_name=self.name,
                     error_type="validation",
                     error_message=error_message or "Invalid input",
-                    retryable=False
+                    retryable=False,
                 )
 
-        # Execute tool
         try:
-            result = await self._arun(*args, **kwargs)
+            if input_data is not None and hasattr(input_data, "model_dump"):
+                result = await self._arun(**input_data.model_dump())
+            elif isinstance(input_data, dict):
+                result = await self._arun(**input_data)
+            else:
+                result = await self._arun(*args, **kwargs)
 
             # Try to parse result as ToolOutput if possible
-            if hasattr(self, 'return_schema') and self.return_schema:
+            if hasattr(self, "return_schema") and self.return_schema:
                 try:
                     self.return_schema.model_validate_json(result)
                 except Exception:
@@ -156,7 +184,7 @@ class OrbitTool(BaseTool, ABC):
                 error_type="execution",
                 error_message=str(e),
                 retryable=True,
-                suggested_fix=self.get_suggested_fix(e)
+                suggested_fix=self.get_suggested_fix(e),
             )
 
     def get_suggested_fix(self, error: Exception) -> Optional[str]:
@@ -185,17 +213,30 @@ class OrbitTool(BaseTool, ABC):
     def get_metadata(cls) -> Dict[str, Any]:
         """
         Get tool metadata for registration.
-
-        Returns:
-            Dictionary with tool metadata
         """
+
+        def get_field_val(name, default):
+            if hasattr(cls, "model_fields") and name in cls.model_fields:
+                return cls.model_fields[name].default
+            elif hasattr(cls, "__fields__") and name in cls.__fields__:
+                # Pydantic V1 fallback
+                return cls.__fields__[name].default
+            return getattr(cls, name, default)
+
+        category_val = get_field_val("category", ToolCategory.SYSTEM)
+        category_str = (
+            category_val.value
+            if isinstance(category_val, ToolCategory)
+            else category_val
+        )
+
         return {
-            "name": cls.name if hasattr(cls, 'name') else cls.__name__,
-            "description": cls.description if hasattr(cls, 'description') else "",
-            "category": cls.category.value if hasattr(cls, 'category') else ToolCategory.SYSTEM.value,
-            "danger_level": cls.danger_level if hasattr(cls, 'danger_level') else 0,
-            "requires_confirmation": cls.requires_confirmation if hasattr(cls, 'requires_confirmation') else False,
-            "allowed_environments": cls.allowed_environments if hasattr(cls, 'allowed_environments') else [],
+            "name": get_field_val("name", cls.__name__),
+            "description": get_field_val("description", ""),
+            "category": category_str,
+            "danger_level": get_field_val("danger_level", 0),
+            "requires_confirmation": get_field_val("requires_confirmation", False),
+            "allowed_environments": get_field_val("allowed_environments", []),
             "module": cls.__module__,
             "class": cls.__name__,
         }
@@ -211,7 +252,7 @@ class OrbitTool(BaseTool, ABC):
         Returns:
             True if safe, False otherwise
         """
-        danger_level = cls.danger_level if hasattr(cls, 'danger_level') else 0
+        danger_level = cls.danger_level if hasattr(cls, "danger_level") else 0
         return danger_level <= user_permission_level
 
     @classmethod
@@ -225,4 +266,6 @@ class OrbitTool(BaseTool, ABC):
         Returns:
             True if confirmation required
         """
-        return cls.requires_confirmation or not cls.is_safe_for_user(user_permission_level)
+        return cls.requires_confirmation or not cls.is_safe_for_user(
+            user_permission_level
+        )

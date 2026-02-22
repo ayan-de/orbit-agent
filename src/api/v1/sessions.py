@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 from uuid import UUID
+from pydantic import BaseModel, ConfigDict
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,61 +26,56 @@ router = APIRouter()
 # Request/Response Schemas
 # ============================================================================
 
-class SessionCreateRequest:
+class SessionCreateRequest(BaseModel):
     """Request schema for creating a session."""
-    def __init__(self, user_id: str, title: Optional[str] = None, meta: Optional[dict] = None):
-        self.user_id = user_id
-        self.title = title
-        self.meta = meta or {}
+    user_id: str
+    title: Optional[str] = None
+    meta: dict = {}
+
+    model_config = ConfigDict(extra="allow")
 
 
-class SessionUpdateRequest:
+class SessionUpdateRequest(BaseModel):
     """Request schema for updating a session."""
-    def __init__(self, title: Optional[str] = None, status: Optional[str] = None):
-        self.title = title
-        self.status = status
+    title: Optional[str] = None
+    status: Optional[str] = None
+
+    model_config = ConfigDict(extra="allow")
 
 
-class SessionResponse:
+class SessionResponse(BaseModel):
     """Response schema for session."""
-    def __init__(
-        self,
-        id: str,
-        user_id: str,
-        title: Optional[str],
-        status: str,
-        meta: dict,
-        created_at: str,
-        updated_at: str,
-        message_count: Optional[int] = None
-    ):
-        self.id = id
-        self.user_id = user_id
-        self.title = title
-        self.status = status
-        self.meta = meta
-        self.created_at = created_at
-        self.updated_at = updated_at
-        self.message_count = message_count
+    id: str
+    user_id: str
+    title: Optional[str]
+    status: str
+    meta: dict
+    created_at: str
+    updated_at: str
+    message_count: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
-class MessageResponse:
+class MessageResponse(BaseModel):
     """Response schema for message."""
-    def __init__(
-        self,
-        id: str,
-        session_id: str,
-        role: str,
-        content: str,
-        meta: dict,
-        created_at: str
-    ):
-        self.id = id
-        self.session_id = session_id
-        self.role = role
-        self.content = content
-        self.meta = meta
-        self.created_at = created_at
+    id: str
+    session_id: str
+    role: str
+    content: str
+    meta: dict
+    created_at: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MessageCreateRequest(BaseModel):
+    """Request schema for creating a message."""
+    role: str
+    content: str
+    meta: dict = {}
+
+    model_config = ConfigDict(extra="allow")
 
 
 # ============================================================================
@@ -481,20 +477,13 @@ async def get_session_messages(
 
 
 @router.post("/{session_id}/messages", response_model=MessageResponse)
-async def add_message(
-    session_id: str,
-    role: str = Query(..., description="Message role (user, assistant, system, tool)"),
-    content: str = Query(..., description="Message content"),
-    meta: Optional[dict] = Query(None, description="Optional metadata")
-):
+async def add_message(session_id: str, request: MessageCreateRequest):
     """
     Add a message to a session.
 
     Args:
         session_id: Session UUID
-        role: Message role
-        content: Message content
-        meta: Optional metadata
+        request: Message creation data
 
     Returns:
         Created message
@@ -504,18 +493,18 @@ async def add_message(
 
         # Validate role
         try:
-            msg_role = MessageRole(role)
+            msg_role = MessageRole(request.role)
         except ValueError:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid role: {role}"
+                detail=f"Invalid role: {request.role}"
             )
 
         message = await memory.add_message(
             session_id=session_id,
             role=msg_role,
-            content=content,
-            meta=meta
+            content=request.content,
+            meta=request.meta
         )
 
         return MessageResponse(

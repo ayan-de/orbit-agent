@@ -515,7 +515,7 @@ class ToolCallRepository:
         )
 
         result = await self.session.execute(stmt)
-        return list(result.scalars().all()
+        return list(result.scalars().all())
 
     async def cleanup_old_calls(
         self,

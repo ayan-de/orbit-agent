@@ -9,8 +9,11 @@ from src.bridge.client import bridge_client, BridgeCommandResponse
 
 class ShellToolInput(ToolInput):
     """Input schema for shell tool."""
+
     command: str = Field(..., description="The shell command to execute.")
-    cwd: Optional[str] = Field(None, description="The directory to execute the command in.")
+    cwd: Optional[str] = Field(
+        None, description="The directory to execute the command in."
+    )
 
 
 class ShellTool(OrbitTool):
@@ -28,7 +31,7 @@ class ShellTool(OrbitTool):
     category: ToolCategory = ToolCategory.SYSTEM
     danger_level: int = 5  # Shell commands can be dangerous (out of 10)
     requires_confirmation: bool = True  # Always require confirmation
-    args_schema: type[ShellToolInput] = ShellToolInput
+    args_schema: type = ShellToolInput
 
     async def _arun(self, command: str, cwd: Optional[str] = None) -> str:
         """

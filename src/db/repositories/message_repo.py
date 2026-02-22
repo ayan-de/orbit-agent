@@ -395,7 +395,7 @@ class MessageRepository:
         )
 
         result = await self.session.execute(stmt)
-        return list(result.scalars().all()
+        return list(result.scalars().all())
 
     async def get_messages_after_timestamp(
         self,

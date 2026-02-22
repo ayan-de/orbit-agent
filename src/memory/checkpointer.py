@@ -10,7 +10,7 @@ from uuid import uuid4, UUID
 import json
 
 from langchain_core.runnables import RunnableConfig
-from langgraph.checkpoint import BaseCheckpointSaver, Checkpoint, CheckpointMetadata
+from langgraph.checkpoint.base import BaseCheckpointSaver, Checkpoint, CheckpointMetadata
 
 from sqlalchemy import select, update, delete, and_
 from sqlalchemy.ext.asyncio import AsyncSession

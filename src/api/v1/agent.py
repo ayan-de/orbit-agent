@@ -88,6 +88,29 @@ async def invoke_agent(request: AgentRequest):
         intent = final_state.get("intent", "unknown")
         command = final_state.get("command", "")
 
+        # For workflow intents, extract commands from the plan
+        if intent == "workflow":
+            plan = final_state.get("plan", {})
+            plan_steps = plan.get("steps", [])
+            if plan_steps:
+                # Extract shell commands from plan steps
+                commands = []
+                for step in plan_steps:
+                    # For shell_exec tool, the command is in arguments
+                    if step.get("tool_name") == "shell_exec":
+                        args = step.get("arguments", {})
+                        cmd = args.get("command", "")
+                        if cmd:
+                            commands.append(cmd)
+
+                # Join multiple commands with && for sequential execution
+                if commands:
+                    command = " && ".join(commands)
+                    print(f"DEBUG API: Workflow extracted {len(commands)} commands: {commands}")
+
+        # Debug: log what we're returning
+        print(f"DEBUG API: intent={intent}, command={repr(command)}")
+
         return AgentResponse(
             messages=[str(last_message)],
             intent=intent,

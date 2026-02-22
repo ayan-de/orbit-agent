@@ -10,6 +10,13 @@ from pathlib import Path
 
 from src.tools.base import OrbitTool
 from src.tools.shell import ShellTool
+from src.tools.file_ops import (
+    ListFilesTool,
+    ReadFileTool,
+    WriteFileTool,
+    CreateDirectoryTool,
+    DeletePathTool,
+)
 
 
 class ToolRegistry:
@@ -30,7 +37,14 @@ class ToolRegistry:
 
         Args:
             tool_class: Tool class (not instance)
+
+        Raises:
+            TypeError: If tool_class is abstract or cannot be instantiated
         """
+        # Skip abstract classes
+        if inspect.isabstract(tool_class):
+            raise TypeError(f"Cannot register abstract class {tool_class.__name__}")
+
         # Create instance to get metadata
         tool_instance = tool_class()
         metadata = tool_class.get_metadata()
@@ -89,13 +103,13 @@ class ToolRegistry:
             List of tool names in the category
         """
         return [
-            name for name, tool_class in self._tools.items()
+            name
+            for name, tool_class in self._tools.items()
             if tool_class.get_metadata().get("category") == category
         ]
 
     def get_safe_tools_for_user(
-        self,
-        user_permission_level: int = 1
+        self, user_permission_level: int = 1
     ) -> Dict[str, OrbitTool]:
         """
         Get tools that are safe for a user based on their permission level.
@@ -113,8 +127,7 @@ class ToolRegistry:
         return safe_tools
 
     def get_tools_requiring_confirmation(
-        self,
-        user_permission_level: int = 1
+        self, user_permission_level: int = 1
     ) -> Dict[str, OrbitTool]:
         """
         Get tools that require user confirmation.
@@ -153,9 +166,7 @@ class ToolRegistry:
         return tool_name in self._tools
 
     def auto_discover_tools(
-        self,
-        package_name: str = "src.tools",
-        base_class: Type[OrbitTool] = OrbitTool
+        self, package_name: str = "src.tools", base_class: Type[OrbitTool] = OrbitTool
     ) -> int:
         """
         Auto-discover tools in a package.
@@ -178,13 +189,13 @@ class ToolRegistry:
         discovered_count = 0
 
         # Scan all modules in the package
-        for _, module_name in inspect.getmembers(package):
+        for name, _ in inspect.getmembers(package):
             # Skip private modules and __init__
-            if module_name.startswith("_") or module_name == "__init__":
+            if not isinstance(name, str) or name.startswith("_") or name == "__init__":
                 continue
 
             # Get the module
-            module = getattr(package, module_name)
+            module = getattr(package, name)
 
             # Skip if it's not a module (e.g., package-level attributes)
             if not inspect.ismodule(module):
@@ -195,6 +206,10 @@ class ToolRegistry:
                 if inspect.isclass(obj) and issubclass(obj, base_class):
                     # Skip the base class itself
                     if obj is base_class:
+                        continue
+
+                    # Skip abstract classes
+                    if inspect.isabstract(obj):
                         continue
 
                     # Skip classes defined in other modules
@@ -239,10 +254,7 @@ class ToolRegistry:
 
         return list(set(matches))  # Remove duplicates
 
-    def format_tools_for_llm(
-        self,
-        tools: Optional[List[str]] = None
-    ) -> List[str]:
+    def format_tools_for_llm(self, tools: Optional[List[str]] = None) -> List[str]:
         """
         Format tools as a string description for LLM.
 
@@ -264,9 +276,7 @@ class ToolRegistry:
                 continue
 
             metadata = tool_instance.get_metadata()
-            formatted.append(
-                f"- {metadata['name']}: {metadata['description']}"
-            )
+            formatted.append(f"- {metadata['name']}: {metadata['description']}")
 
         return formatted
 
@@ -297,9 +307,9 @@ class ToolRegistry:
         }
 
         # Add input/output schema if available
-        if hasattr(tool_class, 'args_schema') and tool_class.args_schema:
+        if hasattr(tool_class, "args_schema") and tool_class.args_schema:
             schema["input_schema"] = tool_class.args_schema.model_json_schema()
-        if hasattr(tool_class, 'return_schema') and tool_class.return_schema:
+        if hasattr(tool_class, "return_schema") and tool_class.return_schema:
             schema["output_schema"] = tool_class.return_schema.model_json_schema()
 
         return schema
@@ -340,6 +350,12 @@ def get_tool_registry() -> ToolRegistry:
         _global_registry.auto_discover_tools()
         # Register ShellTool explicitly
         _global_registry.register_tool(ShellTool)
+        # Register file operation tools
+        _global_registry.register_tool(ListFilesTool)
+        _global_registry.register_tool(ReadFileTool)
+        _global_registry.register_tool(WriteFileTool)
+        _global_registry.register_tool(CreateDirectoryTool)
+        _global_registry.register_tool(DeletePathTool)
 
     return _global_registry
 
