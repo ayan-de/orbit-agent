@@ -1,7 +1,7 @@
 """
 Email API endpoints for Gmail OAuth and email management.
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
@@ -9,6 +9,11 @@ from datetime import datetime
 from src.storage.token_store import get_token_store
 from src.tools.gmail.send import SendEmailTool
 from src.config import settings
+from src.services.gmail_oauth import (
+    get_oauth_authorization_url,
+    exchange_code_for_tokens,
+    refresh_access_token
+)
 
 
 router = APIRouter(prefix="/email", tags=["Email"])
@@ -310,6 +315,93 @@ async def get_sent_emails(
 # ============================================================================
 # OAuth Helper Endpoints (for development/testing)
 # ============================================================================
+
+@router.get("/oauth/authorize")
+async def get_authorization_url(
+    user_id: str = Query(..., description="User identifier for state"),
+    redirect_uri: Optional[str] = Query(None, description="OAuth redirect URI")
+) -> dict:
+    """
+    Generate Gmail OAuth 2.0 authorization URL.
+
+    For development/testing. In production, use NestJS Bridge OAuth flow.
+
+    Args:
+        user_id: User identifier for state parameter
+        redirect_uri: OAuth redirect URI (optional)
+
+    Returns:
+        Authorization URL to redirect user to
+    """
+    try:
+        auth_url = get_oauth_authorization_url(
+            user_id=user_id,
+            redirect_uri=redirect_uri
+        )
+        return {
+            "success": True,
+            "authorization_url": auth_url,
+            "user_id": user_id
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/oauth/callback")
+async def oauth_callback(
+    code: str = Query(..., description="OAuth authorization code"),
+    state: str = Query(..., description="State parameter (user_id)"),
+    redirect_uri: Optional[str] = Query(None, description="OAuth redirect URI")
+) -> dict:
+    """
+    Exchange OAuth authorization code for tokens.
+
+    For development/testing. In production, NestJS Bridge handles this.
+
+    Args:
+        code: Authorization code from Google
+        state: User ID from state parameter
+        redirect_uri: OAuth redirect URI (optional)
+
+    Returns:
+        Token storage result
+    """
+    try:
+        result = await exchange_code_for_tokens(
+            code=code,
+            user_id=state,
+            redirect_uri=redirect_uri
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"OAuth callback failed: {str(e)}"
+        )
+
+
+@router.post("/oauth/refresh")
+async def refresh_tokens(
+    user_id: str = Query(..., description="User identifier")
+) -> dict:
+    """
+    Refresh expired access token.
+
+    Args:
+        user_id: User identifier
+
+    Returns:
+        New access token and expiry
+    """
+    try:
+        result = await refresh_access_token(user_id)
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Token refresh failed: {str(e)}"
+        )
+
 
 @router.post("/oauth/store-tokens")
 async def store_oauth_tokens(request: dict) -> dict:
