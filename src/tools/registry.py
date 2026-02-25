@@ -17,6 +17,7 @@ from src.tools.file_ops import (
     CreateDirectoryTool,
     DeletePathTool,
 )
+from src.tools.gmail.send import SendEmailTool
 
 
 class ToolRegistry:
@@ -356,6 +357,8 @@ def get_tool_registry() -> ToolRegistry:
         _global_registry.register_tool(WriteFileTool)
         _global_registry.register_tool(CreateDirectoryTool)
         _global_registry.register_tool(DeletePathTool)
+        # Register Gmail tools
+        _global_registry.register_tool(SendEmailTool)
 
     return _global_registry
 
