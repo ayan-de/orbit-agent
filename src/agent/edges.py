@@ -8,13 +8,14 @@ from typing import Literal
 from src.agent.state import AgentState
 
 
-def route_after_classifier(state: AgentState) -> Literal["command_generator", "planner", "responder"]:
+def route_after_classifier(state: AgentState) -> Literal["command_generator", "planner", "email_drafter", "responder"]:
     """
     Route after classifier based on intent.
 
     - "question" → responder (simple Q&A)
     - "workflow" → planner (multi-step task)
     - "command" → command_generator (single shell command, Phase 1 flow)
+    - "email" → email_drafter (email sending)
     - "confirmation" → responder (user confirmed action)
     - "unknown" → responder (fallback)
     """
@@ -26,6 +27,8 @@ def route_after_classifier(state: AgentState) -> Literal["command_generator", "p
         return "planner"
     elif intent == "command":
         return "command_generator"
+    elif intent == "email":
+        return "email_drafter"
     elif intent == "confirmation":
         return "responder"
     else:
@@ -123,3 +126,29 @@ def should_respond(state: AgentState) -> bool:
     """
     evaluation_outcome = state.get("evaluation_outcome")
     return evaluation_outcome in ["goal_achieved", "fatal_error", "incomplete"]
+
+
+def route_after_email_preview(state: AgentState) -> Literal["email_sender", "email_refinement", "responder"]:
+    """
+    Route after email preview based on user confirmation.
+
+    - "yes" / "send" / "proceed" → email_sender
+    - "no" / "cancel" → responder
+    - any other input → email_refinement (modify email)
+    """
+    messages = state.get("messages", [])
+    if not messages:
+        return "responder"
+
+    last_message = messages[-1].content.lower()
+
+    # User confirmed - send email
+    if last_message in ["yes", "send", "proceed", "yes send it", "yes, send it"]:
+        return "email_sender"
+
+    # User cancelled
+    if last_message in ["no", "cancel", "abort"]:
+        return "responder"
+
+    # User wants to modify - go to refinement
+    return "email_refinement"

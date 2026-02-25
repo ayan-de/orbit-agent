@@ -12,12 +12,18 @@ from src.agent.nodes.responder import respond
 from src.agent.nodes.planner import PlannerNode, Plan
 from src.agent.nodes.executor import ExecutorNode
 from src.agent.nodes.evaluator import EvaluatorNode
+from src.agent.nodes.email_intent import classify_email_intent
+from src.agent.nodes.email_drafter import draft_email
+from src.agent.nodes.email_preview import show_email_preview
+from src.agent.nodes.email_sender import send_email
+from src.agent.nodes.email_refinement import refine_email
 from src.agent.state import AgentState
 from src.agent.edges import (
     route_after_classifier,
     route_after_planner,
     route_after_executor,
-    route_after_evaluator
+    route_after_evaluator,
+    route_after_email_preview
 )
 from src.memory import get_checkpointer
 
@@ -114,20 +120,26 @@ workflow.add_node("planner", planner)
 workflow.add_node("executor", executor)
 workflow.add_node("evaluator", evaluator)
 workflow.add_node("responder", respond)
+# Email nodes
+workflow.add_node("email_drafter", draft_email)
+workflow.add_node("email_preview", show_email_preview)
+workflow.add_node("email_sender", send_email)
+workflow.add_node("email_refinement", refine_email)
 
 # Define edges
 
 # START → classifier
 workflow.add_edge(START, "classifier")
 
-# classifier → [command_generator | planner | responder]
-# Based on intent: "command", "workflow", "question", "confirmation", "unknown"
+# classifier → [command_generator | planner | email_drafter | responder]
+# Based on intent: "command", "workflow", "email", "question", "confirmation", "unknown"
 workflow.add_conditional_edges(
     "classifier",
     route_after_classifier,
     {
         "command_generator": "command_generator",
         "planner": "planner",
+        "email_drafter": "email_drafter",
         "responder": "responder"
     }
 )
@@ -168,6 +180,28 @@ workflow.add_conditional_edges(
 
 # responder → END
 workflow.add_edge("responder", END)
+
+# Email workflow edges
+# email_drafter → email_preview
+workflow.add_edge("email_drafter", "email_preview")
+
+# email_preview → [email_sender | email_refinement | responder]
+# Based on user confirmation: "yes" to send, "cancel" to abort, otherwise refine
+workflow.add_conditional_edges(
+    "email_preview",
+    route_after_email_preview,
+    {
+        "email_sender": "email_sender",
+        "email_refinement": "email_refinement",
+        "responder": "responder"
+    }
+)
+
+# email_refinement → email_drafter
+workflow.add_edge("email_refinement", "email_drafter")
+
+# email_sender → responder (show success message)
+workflow.add_edge("email_sender", "responder")
 
 # Compile graph (checkpointer attached at runtime)
 app = workflow.compile(checkpointer=None)

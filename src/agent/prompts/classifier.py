@@ -28,12 +28,21 @@ Your job is to analyze the user's latest request and classify it into one of the
    - "refactor the auth module to use JWT"
    - "find all unused variables in the src folder and remove them"
 
-4. "confirmation": The user is responding to a confirmation request (e.g., "yes", "no", "proceed").
+4. "email": The user wants to send an email. This includes explicit email requests or implicit ones mentioning sending something to someone.
+   Examples:
+   - "email 'Happy birthday' to sakil@gmail.com"
+   - "send an email to my boss"
+   - "email the report to manager@gmail.com"
+   - "mail this to sakil"
+   - "send the summary via email"
+   - "list top 10 cars and mail it to sakil@gmail.com"
+
+5. "confirmation": The user is responding to a confirmation request (e.g., "yes", "no", "proceed").
    Examples:
    - "yes, go ahead"
    - "no, cancel"
 
-Output ONLY the category name (command, question, workflow, confirmation) and nothing else.
+Output ONLY the category name (command, question, workflow, email, confirmation) and nothing else.
 """
 
 classifier_prompt = ChatPromptTemplate.from_messages([

@@ -10,7 +10,19 @@ class AgentState(TypedDict):
     messages: Annotated[List[BaseMessage], add_messages]
 
     # Current classification of user intent
-    intent: Literal["command", "question", "workflow", "confirmation", "unknown"]
+    intent: Literal["command", "question", "workflow", "confirmation", "email", "unknown"]
+
+    # Email-specific fields
+    email_draft_id: Optional[int]
+    email_to: Optional[str]
+    email_subject: Optional[str]
+    email_body: Optional[str]
+    email_cc: Optional[List[str]]
+    email_attachments: Optional[List[Dict[str, Any]]]
+    email_needs_confirmation: bool
+    email_confirmation_prompt: Optional[str]
+    email_refinement_iteration: int
+    email_sent_message_id: Optional[str]
 
     # Generated shell command (populated by command_generator)
     command: str
