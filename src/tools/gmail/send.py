@@ -46,6 +46,37 @@ class SendEmailTool(OrbitTool):
     requires_confirmation: bool = True  # Always require confirmation
     args_schema: type = SendEmailInput
 
+    # In-memory rate limit tracker: {user_id: [timestamp, ...]}
+    _rate_tracker: dict = {}
+
+    def _check_rate_limit(self, user_id: str) -> None:
+        """Check if user has exceeded the email rate limit."""
+        from datetime import datetime, timedelta
+
+        now = datetime.now()
+        one_hour_ago = now - timedelta(hours=1)
+
+        # Get user's send timestamps and filter to last hour
+        if user_id not in self._rate_tracker:
+            self._rate_tracker[user_id] = []
+
+        self._rate_tracker[user_id] = [
+            ts for ts in self._rate_tracker[user_id] if ts > one_hour_ago
+        ]
+
+        if len(self._rate_tracker[user_id]) >= settings.EMAIL_RATE_LIMIT:
+            raise Exception(
+                f"Rate limit exceeded. Maximum {settings.EMAIL_RATE_LIMIT} emails per hour. "
+                f"Please wait before sending more."
+            )
+
+    def _record_send(self, user_id: str) -> None:
+        """Record a successful send for rate tracking."""
+        from datetime import datetime
+        if user_id not in self._rate_tracker:
+            self._rate_tracker[user_id] = []
+        self._rate_tracker[user_id].append(datetime.now())
+
     async def _arun(
         self,
         user_id: str,
@@ -73,6 +104,9 @@ class SendEmailTool(OrbitTool):
             from google.oauth2.credentials import Credentials
             from googleapiclient.discovery import build
 
+            # Check rate limit before proceeding
+            self._check_rate_limit(user_id)
+
             # Get tokens from storage
             token_store = get_token_store()
             tokens = token_store.get_tokens(user_id)
@@ -90,10 +124,35 @@ class SendEmailTool(OrbitTool):
             expires_at = tokens["token_expires_at"]
 
             if expires_at <= now + timedelta(minutes=5):
-                # Token needs refresh - for now, ask user to reconnect
-                raise Exception(
-                    "Gmail access token expired. Please reconnect your Gmail account."
-                )
+                # Token needs refresh - attempt automatic refresh
+                try:
+                    from google.auth.transport.requests import Request
+
+                    credentials = Credentials(
+                        token=None,
+                        refresh_token=tokens["refresh_token"],
+                        token_uri="https://oauth2.googleapis.com/token",
+                        client_id=settings.GMAIL_CLIENT_ID,
+                        client_secret=settings.GMAIL_CLIENT_SECRET,
+                        scopes=settings.GMAIL_SCOPES,
+                    )
+                    credentials.refresh(Request())
+
+                    # Update token store with new access token
+                    new_expires_at = credentials.expiry or (now + timedelta(hours=1))
+                    token_store.update_access_token(
+                        user_id=user_id,
+                        access_token=credentials.token,
+                        expires_at=new_expires_at,
+                    )
+
+                    # Use refreshed token
+                    tokens["access_token"] = credentials.token
+                except Exception as refresh_error:
+                    raise Exception(
+                        f"Gmail access token expired and refresh failed: {str(refresh_error)}. "
+                        "Please reconnect your Gmail account."
+                    )
 
             # Create credentials
             credentials = Credentials(
@@ -125,6 +184,9 @@ class SendEmailTool(OrbitTool):
                 .send(userId="me", body={"raw": base64.urlsafe_b64encode(message.as_bytes()).decode()})
                 .execute()
             )
+
+            # Record successful send for rate limiting
+            self._record_send(user_id)
 
             return f"Email sent successfully! Message ID: {result.get('id')}"
 

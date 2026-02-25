@@ -8,14 +8,14 @@ from typing import Literal
 from src.agent.state import AgentState
 
 
-def route_after_classifier(state: AgentState) -> Literal["command_generator", "planner", "email_drafter", "responder"]:
+def route_after_classifier(state: AgentState) -> Literal["command_generator", "planner", "email_intent", "responder"]:
     """
     Route after classifier based on intent.
 
     - "question" → responder (simple Q&A)
     - "workflow" → planner (multi-step task)
     - "command" → command_generator (single shell command, Phase 1 flow)
-    - "email" → email_drafter (email sending)
+    - "email" → email_intent (extract email components, then draft)
     - "confirmation" → responder (user confirmed action)
     - "unknown" → responder (fallback)
     """
@@ -28,7 +28,7 @@ def route_after_classifier(state: AgentState) -> Literal["command_generator", "p
     elif intent == "command":
         return "command_generator"
     elif intent == "email":
-        return "email_drafter"
+        return "email_intent"
     elif intent == "confirmation":
         return "responder"
     else:
@@ -50,6 +50,22 @@ def route_after_planner(state: AgentState) -> Literal["executor", "responder"]:
         return "executor"
     else:
         return "responder"
+
+
+def route_after_email_drafter(state: AgentState) -> Literal["email_preview", "end"]:
+    """
+    Route after email drafter based on whether a draft was created.
+
+    - Draft created (email_needs_confirmation=True) → email_preview
+    - Error occurred (no Gmail connected, no recipient) → end
+    """
+    needs_confirmation = state.get("email_needs_confirmation", False)
+
+    if needs_confirmation:
+        return "email_preview"
+    else:
+        # Draft wasn't created (error) - send the error message to user directly
+        return "end"
 
 
 def route_after_executor(state: AgentState) -> Literal["evaluator"]:
@@ -132,22 +148,24 @@ def route_after_email_preview(state: AgentState) -> Literal["email_sender", "ema
     """
     Route after email preview based on user confirmation.
 
-    - "yes" / "send" / "proceed" → email_sender
-    - "no" / "cancel" → responder
+    - Positive confirmation keywords → email_sender
+    - Cancel/abort keywords → responder
     - any other input → email_refinement (modify email)
     """
     messages = state.get("messages", [])
     if not messages:
         return "responder"
 
-    last_message = messages[-1].content.lower()
+    last_message = messages[-1].content.lower().strip()
 
     # User confirmed - send email
-    if last_message in ["yes", "send", "proceed", "yes send it", "yes, send it"]:
+    confirm_keywords = ["yes", "send", "proceed", "go ahead", "sure", "do it", "confirm", "ok", "okay", "yep", "yup", "y"]
+    if any(kw in last_message for kw in confirm_keywords):
         return "email_sender"
 
     # User cancelled
-    if last_message in ["no", "cancel", "abort"]:
+    cancel_keywords = ["no", "cancel", "abort", "stop", "nevermind", "never mind", "nah", "nope", "n"]
+    if any(kw == last_message or last_message.startswith(kw + " ") or last_message.startswith(kw + ",") for kw in cancel_keywords):
         return "responder"
 
     # User wants to modify - go to refinement

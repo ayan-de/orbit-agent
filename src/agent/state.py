@@ -23,6 +23,9 @@ class AgentState(TypedDict):
     email_confirmation_prompt: Optional[str]
     email_refinement_iteration: int
     email_sent_message_id: Optional[str]
+    # Content generation flags (set by email_intent when email needs data from external sources)
+    needs_content_generation: bool
+    content_source: Optional[str]
 
     # Generated shell command (populated by command_generator)
     command: str

@@ -214,11 +214,32 @@ def get_gmail_credentials(user_id: str) -> Optional[Credentials]:
     needs_refresh = expires_at <= now + timedelta(minutes=5)
 
     if needs_refresh:
-        # Token needs refresh
-        # For simplicity, return None to trigger reconnection
-        # In production, you'd call refresh_access_token()
-        print(f"Token for user {user_id} needs refresh")
-        return None
+        # Token needs refresh - attempt automatic refresh
+        try:
+            from google.auth.transport.requests import Request
+
+            creds = Credentials(
+                token=None,
+                refresh_token=tokens["refresh_token"],
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=settings.GMAIL_CLIENT_ID,
+                client_secret=settings.GMAIL_CLIENT_SECRET,
+                scopes=settings.GMAIL_SCOPES,
+            )
+            creds.refresh(Request())
+
+            # Update token store with new access token
+            new_expires_at = creds.expiry or (now + timedelta(hours=1))
+            token_store.update_access_token(
+                user_id=user_id,
+                access_token=creds.token,
+                expires_at=new_expires_at,
+            )
+
+            return creds
+        except Exception as e:
+            print(f"Token refresh failed for user {user_id}: {e}")
+            return None
 
     # Create credentials
     return Credentials(

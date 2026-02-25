@@ -76,7 +76,20 @@ async def invoke_agent(request: AgentRequest):
             "evaluation_outcome": None,
             "session_id": request.session_id,
             "user_id": request.user_id,
-            "iteration_count": 0
+            "iteration_count": 0,
+            # Email fields
+            "email_draft_id": None,
+            "email_to": None,
+            "email_subject": None,
+            "email_body": None,
+            "email_cc": None,
+            "email_attachments": None,
+            "email_needs_confirmation": False,
+            "email_confirmation_prompt": None,
+            "email_refinement_iteration": 0,
+            "email_sent_message_id": None,
+            "needs_content_generation": False,
+            "content_source": None,
         }
         
         # Invoke the graph
@@ -161,7 +174,20 @@ async def stream_agent(websocket: WebSocket):
             "evaluation_outcome": None,
             "session_id": session_id,
             "user_id": user_id,
-            "iteration_count": 0
+            "iteration_count": 0,
+            # Email fields
+            "email_draft_id": None,
+            "email_to": None,
+            "email_subject": None,
+            "email_body": None,
+            "email_cc": None,
+            "email_attachments": None,
+            "email_needs_confirmation": False,
+            "email_confirmation_prompt": None,
+            "email_refinement_iteration": 0,
+            "email_sent_message_id": None,
+            "needs_content_generation": False,
+            "content_source": None,
         }
 
         # Send start message
@@ -327,7 +353,20 @@ async def stream_agent_with_checkpoint(websocket: WebSocket):
             "evaluation_outcome": None,
             "session_id": session_id,
             "user_id": user_id,
-            "iteration_count": 0
+            "iteration_count": 0,
+            # Email fields
+            "email_draft_id": None,
+            "email_to": None,
+            "email_subject": None,
+            "email_body": None,
+            "email_cc": None,
+            "email_attachments": None,
+            "email_needs_confirmation": False,
+            "email_confirmation_prompt": None,
+            "email_refinement_iteration": 0,
+            "email_sent_message_id": None,
+            "needs_content_generation": False,
+            "content_source": None,
         }
 
         # Config for checkpointer

@@ -65,6 +65,8 @@ async def draft_email(state: AgentState) -> Dict[str, Any]:
     token_store = get_token_store()
     connection = token_store.get_connection_status(user_id)
 
+    print(f"DEBUG email_drafter: user_id={repr(user_id)}, connection={connection}, all_keys={list(token_store._tokens.keys())}")
+
     if not connection["is_connected"]:
         from langchain_core.messages import AIMessage
         return {
@@ -74,31 +76,26 @@ async def draft_email(state: AgentState) -> Dict[str, Any]:
 
     from_email = connection["email_address"]
 
-    # Generate/refine email body
-    if iteration == 0:
-        # First draft - create initial email
-        body = current_body
-    else:
-        # Refinement - apply user changes
-        llm = llm_factory(temperature=0.3)
-        from langchain_core.prompts import ChatPromptTemplate
-        from langchain_core.output_parsers import StrOutputParser
+    # Generate/refine email body using LLM
+    llm = llm_factory(temperature=0.3)
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.output_parsers import StrOutputParser
 
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", EMAIL_DRAFTER_PROMPT),
-            ("user", "{user_request}")
-        ])
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", EMAIL_DRAFTER_PROMPT),
+        ("user", "{user_request}")
+    ])
 
-        chain = prompt | llm | StrOutputParser()
+    chain = prompt | llm | StrOutputParser()
 
-        body = await chain.ainvoke({
-            "user_id": user_id,
-            "to_email": to_email,
-            "subject": subject,
-            "current_body": current_body,
-            "user_request": user_request,
-            "iteration": iteration
-        })
+    body = await chain.ainvoke({
+        "user_id": user_id,
+        "to_email": to_email,
+        "subject": subject,
+        "current_body": current_body,
+        "user_request": user_request,
+        "iteration": iteration
+    })
 
     # Create preview message
     preview = _format_email_preview(

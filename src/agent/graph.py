@@ -23,6 +23,7 @@ from src.agent.edges import (
     route_after_planner,
     route_after_executor,
     route_after_evaluator,
+    route_after_email_drafter,
     route_after_email_preview
 )
 from src.memory import get_checkpointer
@@ -121,6 +122,7 @@ workflow.add_node("executor", executor)
 workflow.add_node("evaluator", evaluator)
 workflow.add_node("responder", respond)
 # Email nodes
+workflow.add_node("email_intent", classify_email_intent)
 workflow.add_node("email_drafter", draft_email)
 workflow.add_node("email_preview", show_email_preview)
 workflow.add_node("email_sender", send_email)
@@ -131,7 +133,7 @@ workflow.add_node("email_refinement", refine_email)
 # START → classifier
 workflow.add_edge(START, "classifier")
 
-# classifier → [command_generator | planner | email_drafter | responder]
+# classifier → [command_generator | planner | email_intent | responder]
 # Based on intent: "command", "workflow", "email", "question", "confirmation", "unknown"
 workflow.add_conditional_edges(
     "classifier",
@@ -139,10 +141,13 @@ workflow.add_conditional_edges(
     {
         "command_generator": "command_generator",
         "planner": "planner",
-        "email_drafter": "email_drafter",
+        "email_intent": "email_intent",
         "responder": "responder"
     }
 )
+
+# email_intent → email_drafter (after extracting email components from user message)
+workflow.add_edge("email_intent", "email_drafter")
 
 # command_generator → responder (Phase 1 flow)
 workflow.add_edge("command_generator", "responder")
@@ -182,8 +187,16 @@ workflow.add_conditional_edges(
 workflow.add_edge("responder", END)
 
 # Email workflow edges
-# email_drafter → email_preview
-workflow.add_edge("email_drafter", "email_preview")
+# email_drafter → [email_preview | END]
+# If draft was created (needs confirmation) → preview, otherwise → END (error message preserved)
+workflow.add_conditional_edges(
+    "email_drafter",
+    route_after_email_drafter,
+    {
+        "email_preview": "email_preview",
+        "end": END
+    }
+)
 
 # email_preview → [email_sender | email_refinement | responder]
 # Based on user confirmation: "yes" to send, "cancel" to abort, otherwise refine

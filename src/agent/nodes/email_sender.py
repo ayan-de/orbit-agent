@@ -52,7 +52,7 @@ async def send_email(state: AgentState) -> Dict[str, Any]:
         return {
             "messages": [AIMessage(content=f"✓ {result}")],
             "email_needs_confirmation": False,
-            "email_sent_message_id": result.split("Message ID: ")[1] if "Message ID:" in result else None
+            "email_sent_message_id": result.split("Message ID: ")[1] if "Message ID: " in result else None
         }
 
     except Exception as e:
