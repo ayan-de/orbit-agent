@@ -21,13 +21,13 @@ Context:
 - Iteration: {iteration}
 
 If the user is asking to modify the email (iteration > 0), apply their changes to the existing draft.
-If this is a new draft (iteration 0), create a professional email based on their request.
+If this is a new draft (iteration 0), create the email body based on their request.
 
-Guidelines:
-1. Keep the email concise and professional
-2. Use proper greetings and closings
-3. If content needs to be generated from a source (Jira, web search, etc.), include a placeholder
-4. Maintain the user's tone unless they ask to change it
+IMPORTANT Guidelines:
+1. If the user provides a short, simple message (e.g. "hi", "hello world", "thanks for the meeting"), use their exact words as the email body. Do NOT add greetings, closings, filler text, or formatting they didn't ask for.
+2. Only add professional formatting (greetings, closings, structure) if the user explicitly asks for a formal/professional email OR if the content is clearly meant to be a longer, structured email (e.g. "write a formal email about the project update").
+3. Preserve the user's tone and intent exactly.
+4. If content needs to be generated from a source (Jira, web search, etc.), include a placeholder.
 
 Return the updated email body only, nothing else.
 """
@@ -76,26 +76,31 @@ async def draft_email(state: AgentState) -> Dict[str, Any]:
 
     from_email = connection["email_address"]
 
-    # Generate/refine email body using LLM
-    llm = llm_factory(temperature=0.3)
-    from langchain_core.prompts import ChatPromptTemplate
-    from langchain_core.output_parsers import StrOutputParser
+    # Generate/refine email body
+    if iteration == 0:
+        # First draft - use user's exact text as-is
+        body = current_body
+    else:
+        # Refinement - apply user changes via LLM
+        llm = llm_factory(temperature=0.3)
+        from langchain_core.prompts import ChatPromptTemplate
+        from langchain_core.output_parsers import StrOutputParser
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", EMAIL_DRAFTER_PROMPT),
-        ("user", "{user_request}")
-    ])
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", EMAIL_DRAFTER_PROMPT),
+            ("user", "{user_request}")
+        ])
 
-    chain = prompt | llm | StrOutputParser()
+        chain = prompt | llm | StrOutputParser()
 
-    body = await chain.ainvoke({
-        "user_id": user_id,
-        "to_email": to_email,
-        "subject": subject,
-        "current_body": current_body,
-        "user_request": user_request,
-        "iteration": iteration
-    })
+        body = await chain.ainvoke({
+            "user_id": user_id,
+            "to_email": to_email,
+            "subject": subject,
+            "current_body": current_body,
+            "user_request": user_request,
+            "iteration": iteration
+        })
 
     # Create preview message
     preview = _format_email_preview(
