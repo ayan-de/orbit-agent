@@ -26,3 +26,7 @@ build/
 # Alembic
 *.db
 *.sqlite
+
+# Data storage (contains encrypted tokens)
+data/
+*.json
