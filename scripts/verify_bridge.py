@@ -7,7 +7,18 @@ from fastapi import FastAPI, Body
 # Add the project root to sys.path
 sys.path.append(os.getcwd())
 
-from src.bridge.client import BridgeClient, BridgeCommandResponse
+from src.bridge import OrchestratorClient, BridgeCommandResponse
+
+"""
+NOTE: This script tests the OrchestratorClient (Python → Bridge via HTTP)
+
+There are two different clients in the system:
+1. OrchestratorClient (Python): Python Agent → Bridge (HTTP)
+2. DesktopClient (TypeScript): Desktop TUI → Bridge (WebSocket)
+
+This script tests #1 (OrchestratorClient) which is used by the Python Agent
+to send commands to the Bridge for execution on Desktop TUI.
+"""
 
 # Mock Bridge Server
 mock_app = FastAPI()
@@ -48,8 +59,8 @@ async def run_client_test():
     # Wait for server to start
     await asyncio.sleep(2)
     
-    print("\n--- Testing Bridge Client ---")
-    client = BridgeClient(base_url="http://localhost:3001")
+    print("\n--- Testing Orchestrator Client ---")
+    client = OrchestratorClient(base_url="http://localhost:3001")
     
     try:
         print("1. Testing 'ls' command...")

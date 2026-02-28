@@ -8,7 +8,7 @@ from src.bridge.schemas import BridgeCommandRequest, BridgeCommandResponse
 logger = logging.getLogger("orbit.bridge")
 
 
-class BridgeClient:
+class OrchestratorClient:
     """
     Client for communicating with NestJS Bridge service.
 
@@ -154,4 +154,4 @@ class BridgeClient:
 
 
 # Global instance
-bridge_client = BridgeClient()
+orchestrator_client = OrchestratorClient()

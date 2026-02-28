@@ -71,7 +71,7 @@ class ShellTool(OrbitTool):
             args = parts[1:]
 
             # Execute via Bridge
-            response = await bridge_client.execute_command(cmd, args, cwd)
+            response = await orchestrator_client.execute_command(cmd, args, cwd)
 
             if response.exit_code != 0:
                 error_msg = f"Command failed with exit code {response.exit_code}"
