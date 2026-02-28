@@ -9,7 +9,26 @@ logger = logging.getLogger("orbit.bridge")
 
 
 class BridgeClient:
-    """Client for communicating with NestJS Bridge service."""
+    """
+    Client for communicating with NestJS Bridge service.
+
+    ARCHITECTURE NOTE:
+    The Bridge's CommandsController is the SINGLE AUTHORITY for shell command execution.
+
+    Usage Guidelines:
+    - This client calls Bridge's /api/v1/commands/execute endpoint
+    - Bridge routes to Desktop TUI via WebSocket for actual shell execution
+    - NO component except Desktop TUI should execute shell commands directly
+
+    When to use this client:
+    - Multi-step workflows where Agent needs to execute commands during workflow
+    - Tool implementations that require shell command execution
+    - File system operations that require shell commands
+
+    When NOT to use this client:
+    - Simple NLP-to-command translation (use agent response instead)
+    - Direct shell access (should only happen in Desktop TUI)
+    """
 
     def __init__(
         self,

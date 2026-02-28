@@ -20,14 +20,31 @@ class ShellTool(OrbitTool):
     """
     Shell command execution tool.
 
-    Executes shell commands on the user's machine via the NestJS Bridge.
-    Useful for file operations, git commands, running tests, etc.
+    Executes shell commands via the NestJS Bridge's SINGLE AUTHORITY endpoint.
+
+    ARCHITECTURE NOTE:
+    - This tool calls Bridge's /api/v1/commands/execute (the single authority)
+    - Bridge routes to Desktop TUI via WebSocket for actual shell execution
+    - NO component except Desktop TUI executes shell commands directly
+
+    Use Cases:
+    - Multi-step workflows requiring shell execution during workflow
+    - File operations, git commands, running tests, etc.
+    - Any tool implementation that needs shell command execution
+
+    Usage Pattern:
+    1. Agent includes this tool in workflow execution
+    2. Agent calls tool with command
+    3. Tool calls Bridge's single authority endpoint
+    4. Bridge routes to Desktop TUI
+    5. Desktop executes and returns result
+    6. Tool returns result to Agent
 
     Requires confirmation before execution due to high danger level.
     """
 
     name: str = "shell_exec"
-    description: str = "Executes a shell command on the user's machine via the bridge. Use this for file operations, git commands, running tests, etc."
+    description: str = "Executes a shell command via the Bridge's single authority endpoint. Use for file operations, git commands, running tests, etc. The Bridge routes commands to the connected Desktop TUI for actual execution."
     category: ToolCategory = ToolCategory.SYSTEM
     danger_level: int = 5  # Shell commands can be dangerous (out of 10)
     requires_confirmation: bool = True  # Always require confirmation
