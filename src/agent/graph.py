@@ -2,6 +2,42 @@
 LangGraph workflow definition for Orbit AI Agent.
 
 Defines the complete state graph with nodes and conditional edges.
+
+ARCHITECTURE NOTE - INTERNAL ROUTING:
+This graph implements the INTERNAL ROUTING system for the agent.
+
+There are TWO distinct routing systems in the Orbit architecture:
+
+1. EXTERNAL ROUTING (TypeScript MessageRouterService):
+   - Routes: External Chat Platforms → Bridge → Agent
+   - Scope: Routing messages FROM platforms TO the agent system
+   - Pattern: Strategy Pattern for platform adapters
+   - File: packages/bridge/src/application/adapters/message-router.service.ts
+
+2. INTERNAL ROUTING (this - Python LangGraph):
+   - Routes: Agent Intent Classification → Workflow Nodes
+   - Scope: Routing WITHIN agent state machine
+   - Pattern: LangGraph conditional edges
+   - File: this file (graph.py)
+
+ROUTING BOUNDARY:
+- External Router: ENDS at the Python Agent (hands off to agent)
+- Internal Router: STARTS at the Python Agent (takes over from external router)
+
+FLOW:
+User/Chat → MessageRouterService (EXTERNAL) → Python Agent → LangGraph (INTERNAL)
+
+INTERNAL ROUTING RESPONSIBILITIES (this graph):
+- Classify user intent (command, question, workflow, email)
+- Route to appropriate node based on intent
+- Execute plans if needed (planner → executor → evaluator cycle)
+- Generate responses via responder node
+- Handle email workflow (intent → drafter → preview → sender/refinement)
+
+EXTERNAL ROUTING DOES NOT:
+- Decide agent intent (that's classifier node's job)
+- Plan multi-step workflows (that's planner node's job)
+- Execute tools (that's executor node's job)
 """
 
 from typing import Dict, Any, Optional

@@ -1,7 +1,37 @@
 """
 Conditional edge functions for LangGraph workflow.
 
-Determines routing between nodes based on agent state.
+INTERNAL ROUTING SYSTEM:
+These functions implement the INTERNAL ROUTING logic for the agent's state machine.
+
+ARCHITECTURE BOUNDARIES:
+There are TWO distinct routing systems in the Orbit architecture:
+
+1. EXTERNAL ROUTING (TypeScript MessageRouterService):
+   - Routes: External Chat Platforms → Bridge → Agent
+   - Scope: Routing messages FROM platforms TO the agent system
+   - Pattern: Strategy Pattern for platform adapters
+   - File: packages/bridge/src/application/adapters/message-router.service.ts
+
+2. INTERNAL ROUTING (this - Python LangGraph Edges):
+   - Routes: Agent Intent → Workflow Nodes
+   - Scope: Routing WITHIN agent state machine
+   - Pattern: Conditional edge functions
+   - File: this file (edges.py) + graph.py
+
+ROUTING BOUNDARY:
+- External Router: ENDS at the Python Agent (hands off to agent)
+- Internal Router (this): STARTS at the Python Agent (takes over from external router)
+
+These edge functions decide:
+- Which node to execute next based on current state
+- When to transition between workflow phases
+- When to end the workflow and return a response
+
+NOT EXTERNAL ROUTING:
+- These functions do NOT route between different platforms
+- They do NOT handle platform-specific message formats
+- They do NOT manage WebSocket connections (that's external router's job)
 """
 
 from typing import Literal
