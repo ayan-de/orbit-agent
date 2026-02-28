@@ -10,7 +10,7 @@ from typing import Optional
 from pydantic import Field
 
 from src.tools.base import OrbitTool, ToolCategory, ToolInput
-from src.bridge.client import bridge_client
+from src.bridge.orchestrator_client import orchestrator_client
 
 
 class ListFilesInput(ToolInput):
@@ -76,7 +76,7 @@ class ListFilesTool(OrbitTool):
 
     async def _arun(self, path: str = ".") -> str:
         try:
-            response = await bridge_client.list_files(path=path)
+            response = await orchestrator_client.list_files(path=path)
 
             if response.exit_code != 0:
                 raise Exception(f"Failed to list files: {response.stderr}")
@@ -99,7 +99,7 @@ class ReadFileTool(OrbitTool):
 
     async def _arun(self, path: str) -> str:
         try:
-            response = await bridge_client.read_file(path=path)
+            response = await orchestrator_client.read_file(path=path)
 
             if response.exit_code != 0:
                 raise Exception(f"Failed to read file: {response.stderr}")
@@ -132,7 +132,7 @@ class WriteFileTool(OrbitTool):
         self, path: str, content: str, mode: str = "write", create_dirs: bool = True
     ) -> str:
         try:
-            response = await bridge_client.write_file(
+            response = await orchestrator_client.write_file(
                 path=path, content=content, mode=mode, create_dirs=create_dirs
             )
 
@@ -157,7 +157,7 @@ class CreateDirectoryTool(OrbitTool):
 
     async def _arun(self, path: str, create_parents: bool = True) -> str:
         try:
-            response = await bridge_client.create_directory(
+            response = await orchestrator_client.create_directory(
                 path=path, create_parents=create_parents
             )
 
@@ -186,7 +186,7 @@ class DeletePathTool(OrbitTool):
         self, path: str, recursive: bool = False, force: bool = False
     ) -> str:
         try:
-            response = await bridge_client.delete_path(
+            response = await orchestrator_client.delete_path(
                 path=path, recursive=recursive, force=force
             )
 

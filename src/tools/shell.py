@@ -4,7 +4,7 @@ import shlex
 from pydantic import BaseModel, Field
 
 from src.tools.base import OrbitTool, ToolCategory, ToolInput, ToolError
-from src.bridge.client import bridge_client, BridgeCommandResponse
+from src.bridge.orchestrator_client import orchestrator_client, BridgeCommandResponse
 
 
 class ShellToolInput(ToolInput):
