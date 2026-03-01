@@ -21,6 +21,41 @@ class ToolCategory(str, Enum):
     ANALYSIS = "analysis"  # Data analysis and reporting
 
 
+class DangerLevel(str, Enum):
+    """
+    Danger level scale for tools (0-10).
+
+    Scale Definition:
+    0-2: SAFE - Read-only or harmless operations
+         - Reading files
+         - Listing directories
+         - Querying information
+
+    3-5: MODERATE - Write operations or external actions
+         - Writing files
+         - Creating directories
+         - Sending emails
+         - Running simple commands
+
+    6-10: DANGEROUS - Destructive or irreversible operations
+         - Deleting files/directories
+         - Running complex shell commands
+         - Pushing to git
+         - Any operation that modifies external systems
+
+    This scale helps determine when user confirmation is required.
+    """
+
+    SAFE_MIN = 0  # Completely harmless
+    SAFE_MAX = 2  # Safe to run without confirmation
+
+    MODERATE_MIN = 3  # Requires confirmation
+    MODERATE_MAX = 5  # Moderate risk
+
+    DANGEROUS_MIN = 6  # High risk, always requires confirmation
+    DANGEROUS_MAX = 10  # Maximum danger
+
+
 class ToolInput(BaseModel):
     """Base class for tool input validation."""
 
@@ -50,6 +85,24 @@ class ToolError(BaseModel):
     )
 
 
+def get_danger_category(danger_level: int) -> str:
+    """
+    Get the danger category string based on danger level.
+
+    Args:
+        danger_level: Numeric danger level (0-10)
+
+    Returns:
+        Category string: "safe", "moderate", or "dangerous"
+    """
+    if danger_level <= 2:
+        return "safe"
+    elif danger_level <= 5:
+        return "moderate"
+    else:
+        return "dangerous"
+
+
 class OrbitTool(BaseTool, ABC):
     """
     Base class for all Orbit AI Agent tools.
@@ -77,8 +130,20 @@ class OrbitTool(BaseTool, ABC):
 
     # Metadata (should be overridden by subclasses)
     category: ToolCategory = ToolCategory.SYSTEM
-    danger_level: int = 0  # 0-10, higher means more dangerous
+
+    # Danger level: 0-10 scale (see DangerLevel enum for details)
+    # 0-2: SAFE (read-only, no confirmation needed)
+    # 3-5: MODERATE (writes, external actions, confirmation recommended)
+    # 6-10: DANGEROUS (destructive, requires confirmation)
+    danger_level: int = 0
+
+    # Whether this tool requires explicit user confirmation before execution
+    # If True, agent must ask user before running this tool
+    # If False, tool runs automatically (subject to danger_level checks)
     requires_confirmation: bool = False
+
+    # Environments where this tool is allowed to run
+    # Used for safety in production deployments
     allowed_environments: list[str] = ["dev", "staging", "production"]
 
     # Validation
