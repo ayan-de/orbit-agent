@@ -53,6 +53,7 @@ from src.agent.nodes.email_drafter import draft_email
 from src.agent.nodes.email_preview import show_email_preview
 from src.agent.nodes.email_sender import send_email
 from src.agent.nodes.email_refinement import refine_email
+from src.agent.nodes.memory_loader import memory_loader_node
 from src.agent.state import AgentState
 from src.agent.edges import (
     route_after_classifier,
@@ -151,6 +152,7 @@ async def evaluator(state: AgentState) -> Dict[str, Any]:
 workflow = StateGraph(AgentState)
 
 # Add all nodes
+workflow.add_node("memory_loader", memory_loader_node)
 workflow.add_node("classifier", classify_intent)
 workflow.add_node("command_generator", generate_command)
 workflow.add_node("planner", planner)
@@ -166,8 +168,9 @@ workflow.add_node("email_refinement", refine_email)
 
 # Define edges
 
-# START → classifier
-workflow.add_edge(START, "classifier")
+# START → memory_loader → classifier
+workflow.add_edge(START, "memory_loader")
+workflow.add_edge("memory_loader", "classifier")
 
 # classifier → [command_generator | planner | email_intent | responder]
 # Based on intent: "command", "workflow", "email", "question", "confirmation", "unknown"

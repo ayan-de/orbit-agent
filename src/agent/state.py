@@ -55,3 +55,8 @@ class AgentState(TypedDict):
     session_id: str
     user_id: str
     iteration_count: int
+
+    # Memory context (populated by memory_loader node)
+    memory_context: str
+    memory_available: bool
+    compaction_needed: bool
