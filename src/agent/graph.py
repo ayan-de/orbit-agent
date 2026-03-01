@@ -54,6 +54,10 @@ from src.agent.nodes.email_preview import show_email_preview
 from src.agent.nodes.email_sender import send_email
 from src.agent.nodes.email_refinement import refine_email
 from src.agent.nodes.memory_loader import memory_loader_node
+from src.agent.nodes.human_input import (
+    human_input_node,
+    route_after_confirmation,
+)
 from src.agent.state import AgentState
 from src.agent.edges import (
     route_after_classifier,
@@ -159,6 +163,7 @@ workflow.add_node("planner", planner)
 workflow.add_node("executor", executor)
 workflow.add_node("evaluator", evaluator)
 workflow.add_node("responder", respond)
+workflow.add_node("human_input", human_input_node)
 # Email nodes
 workflow.add_node("email_intent", classify_email_intent)
 workflow.add_node("email_drafter", draft_email)
@@ -191,11 +196,22 @@ workflow.add_edge("email_intent", "email_drafter")
 # command_generator → responder (Phase 1 flow)
 workflow.add_edge("command_generator", "responder")
 
-# planner → [executor | responder]
-# If plan has steps → executor, otherwise → responder
+# planner → [human_input | responder]
+# If plan has steps → human_input (for confirmation), otherwise → responder
 workflow.add_conditional_edges(
     "planner",
     route_after_planner,
+    {
+        "human_input": "human_input",
+        "responder": "responder"
+    }
+)
+
+# human_input → [executor | responder]
+# Based on user confirmation: approved → executor, denied → responder
+workflow.add_conditional_edges(
+    "human_input",
+    route_after_confirmation,
     {
         "executor": "executor",
         "responder": "responder"

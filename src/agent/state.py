@@ -51,6 +51,14 @@ class AgentState(TypedDict):
         ]
     ]
 
+    # Human input / tool confirmation fields
+    user_confirmation: Optional[bool]  # True=approved, False=denied, None=pending
+    confirmation_processed: bool
+    user_response: Optional[str]
+    pending_tool_name: Optional[str]
+    pending_tool_danger_level: Optional[int]
+    auto_approved: bool
+
     # Metadata
     session_id: str
     user_id: str
@@ -60,3 +68,7 @@ class AgentState(TypedDict):
     memory_context: str
     memory_available: bool
     compaction_needed: bool
+
+    # Environment and permissions
+    environment: Literal["dev", "staging", "production"]
+    user_permission_level: int
