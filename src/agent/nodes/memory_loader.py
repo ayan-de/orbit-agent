@@ -8,6 +8,11 @@ This node should run early in the workflow to provide context for LLM decisions.
 from typing import Dict, Any
 
 from src.agent.state import AgentState
+from src.memory.compaction import (
+    auto_compaction,
+    check_compaction_needed,
+    get_compaction_status,
+)
 from src.memory.reader import (
     format_profile_for_llm,
     format_workflows_for_llm,
@@ -125,30 +130,40 @@ def get_memory_summary(state: AgentState) -> str:
     return f"Loaded: {', '.join(parts)}"
 
 
-# Compaction check stub (to be implemented in Day 5)
-# This function will be expanded in Day 5 to check if compaction is needed
-async def check_compaction_needed(state: AgentState) -> bool:
-    """
-    Check if memory compaction is needed based on context window usage.
+# ============================================================================
+# Compaction Integration
+# ============================================================================
 
-    This is a stub implementation. In Day 5, this will be enhanced to:
-    1. Calculate total memory size
-    2. Compare against context window (e.g., 80% threshold)
-    3. Return True if compaction should be triggered
+async def check_compaction_for_loader(state: AgentState, enable_auto_compaction: bool = False) -> bool:
+    """
+    Check if memory compaction is needed and optionally trigger it.
 
     Args:
         state: Current agent state
+        enable_auto_compaction: Whether to automatically run compaction
 
     Returns:
-        True if compaction is needed, False otherwise
+        True if compaction was run, False otherwise
     """
-    # For now, always return False
-    # Will be enhanced in Day 5
+    compaction_status = get_compaction_status()
+
+    if compaction_status["can_compact"]:
+        if enable_auto_compaction:
+            # Trigger automatic compaction
+            compaction_result = await auto_compaction()
+            # Log the compaction (could be stored in state or logged)
+            return compaction_result.get("compaction_performed", False)
+
+        return True  # Compaction is needed but not triggered
+
     return False
 
 
 # Main node function for LangGraph
-async def memory_loader_node(state: AgentState) -> Dict[str, Any]:
+async def memory_loader_node(
+    state: AgentState,
+    enable_auto_compaction: bool = False,
+) -> Dict[str, Any]:
     """
     Main memory loader node for LangGraph.
 
@@ -156,6 +171,7 @@ async def memory_loader_node(state: AgentState) -> Dict[str, Any]:
 
     Args:
         state: Current agent state
+        enable_auto_compaction: Whether to automatically run compaction when threshold exceeded
 
     Returns:
         State updates with memory_context and compaction_needed fields
@@ -163,8 +179,8 @@ async def memory_loader_node(state: AgentState) -> Dict[str, Any]:
     # Load memory context
     updates = await load_memory_context(state)
 
-    # Check if compaction is needed (will be implemented in Day 5)
-    compaction_needed = await check_compaction_needed(state)
+    # Check if compaction is needed and optionally run it
+    compaction_needed = await check_compaction_for_loader(state, enable_auto_compaction)
     updates["compaction_needed"] = compaction_needed
 
     return updates
