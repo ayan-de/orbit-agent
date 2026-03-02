@@ -31,7 +31,7 @@ class SearchTicketsTool(OrbitTool):
     """
 
     name: str = "jira_search_tickets"
-    description: "Search Jira tickets by query text or JQL. Supports filtering by project."
+    description: str = "Search Jira tickets by query text or JQL. Supports filtering by project."
     category: ToolCategory = ToolCategory.INTEGRATION
     danger_level: int = 1  # Read-only, safe
     requires_confirmation: bool = False

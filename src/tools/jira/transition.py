@@ -24,7 +24,7 @@ class TransitionTicketTool(OrbitTool):
     """
 
     name: str = "jira_transition_ticket"
-    description: "Transition a Jira ticket to a new status (e.g., mark as Done, move to In Progress)."
+    description: str = "Transition a Jira ticket to a new status (e.g., mark as Done, move to In Progress)."
     category: ToolCategory = ToolCategory.INTEGRATION
     danger_level: int = 4  # Moderate - modifies external system
     requires_confirmation: bool = True  # Always confirm before changing status

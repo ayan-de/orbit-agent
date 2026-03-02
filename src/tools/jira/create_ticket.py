@@ -40,7 +40,7 @@ class CreateTicketTool(OrbitTool):
     """
 
     name: str = "jira_create_ticket"
-    description: "Create a new Jira ticket in a project."
+    description: str = "Create a new Jira ticket in a project."
     category: ToolCategory = ToolCategory.INTEGRATION
     danger_level: int = 4  # Moderate - modifies external system
     requires_confirmation: bool = True  # Always confirm before creating

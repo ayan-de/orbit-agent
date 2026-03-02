@@ -39,7 +39,7 @@ class ListTicketsTool(OrbitTool):
     """
 
     name: str = "jira_list_tickets"
-    description: "List Jira tickets assigned to the user. Supports filtering by status, project, and limiting results."
+    description: str = "List Jira tickets assigned to the user. Supports filtering by status, project, and limiting results."
     category: ToolCategory = ToolCategory.INTEGRATION
     danger_level: int = 1  # Read-only, safe
     requires_confirmation: bool = False

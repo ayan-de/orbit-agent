@@ -24,7 +24,7 @@ class AddCommentTool(OrbitTool):
     """
 
     name: str = "jira_add_comment"
-    description: "Add a comment to a Jira ticket."
+    description: str = "Add a comment to a Jira ticket."
     category: ToolCategory = ToolCategory.INTEGRATION
     danger_level: int = 3  # Moderate - modifies external system
     requires_confirmation: bool = False  # Comments are low-risk

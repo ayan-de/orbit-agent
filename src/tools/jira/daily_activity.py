@@ -31,7 +31,7 @@ class DailyActivityTool(OrbitTool):
     """
 
     name: str = "jira_daily_activity"
-    description: "Get a summary of user's Jira activity (tickets worked on) for a time period."
+    description: str = "Get a summary of user's Jira activity (tickets worked on) for a time period."
     category: ToolCategory = ToolCategory.INTEGRATION
     danger_level: int = 1  # Read-only, safe
     requires_confirmation: bool = False

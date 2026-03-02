@@ -25,6 +25,7 @@ from src.tools.jira.add_comment import AddCommentTool
 from src.tools.jira.daily_activity import DailyActivityTool
 from src.tools.jira.search import SearchTicketsTool
 from src.tools.jira.create_ticket import CreateTicketTool
+from src.tools.web.tavily import WebSearchTool, NewsSearchTool
 
 
 class ToolRegistry:
@@ -374,6 +375,9 @@ def get_tool_registry() -> ToolRegistry:
         _global_registry.register_tool(DailyActivityTool)
         _global_registry.register_tool(SearchTicketsTool)
         _global_registry.register_tool(CreateTicketTool)
+        # Register Web Search tools
+        _global_registry.register_tool(WebSearchTool)
+        _global_registry.register_tool(NewsSearchTool)
 
     return _global_registry
 

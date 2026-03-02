@@ -23,7 +23,7 @@ class GetTicketDetailsTool(OrbitTool):
     """
 
     name: str = "jira_get_ticket"
-    description: "Get detailed information about a specific Jira ticket by key."
+    description: str = "Get detailed information about a specific Jira ticket by key."
     category: ToolCategory = ToolCategory.INTEGRATION
     danger_level: int = 1  # Read-only, safe
     requires_confirmation: bool = False
