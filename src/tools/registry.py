@@ -18,6 +18,13 @@ from src.tools.file_ops import (
     DeletePathTool,
 )
 from src.tools.gmail.send import SendEmailTool
+from src.tools.jira.list_tickets import ListTicketsTool
+from src.tools.jira.get_ticket import GetTicketDetailsTool
+from src.tools.jira.transition import TransitionTicketTool
+from src.tools.jira.add_comment import AddCommentTool
+from src.tools.jira.daily_activity import DailyActivityTool
+from src.tools.jira.search import SearchTicketsTool
+from src.tools.jira.create_ticket import CreateTicketTool
 
 
 class ToolRegistry:
@@ -359,6 +366,14 @@ def get_tool_registry() -> ToolRegistry:
         _global_registry.register_tool(DeletePathTool)
         # Register Gmail tools
         _global_registry.register_tool(SendEmailTool)
+        # Register Jira tools
+        _global_registry.register_tool(ListTicketsTool)
+        _global_registry.register_tool(GetTicketDetailsTool)
+        _global_registry.register_tool(TransitionTicketTool)
+        _global_registry.register_tool(AddCommentTool)
+        _global_registry.register_tool(DailyActivityTool)
+        _global_registry.register_tool(SearchTicketsTool)
+        _global_registry.register_tool(CreateTicketTool)
 
     return _global_registry
 

@@ -26,6 +26,15 @@ class TokenStore:
             "provider": "gmail",
             "created_at": "2024-02-20T10:30:00Z",
             "updated_at": "2024-02-20T10:30:00Z"
+        },
+        "jira": {
+            "base_url": "https://your-domain.atlassian.net",
+            "email": "user@example.com",
+            "api_token": "encrypted_api_token",
+            "username": "user@example.com",
+            "provider": "jira",
+            "created_at": "2024-02-20T10:30:00Z",
+            "updated_at": "2024-02-20T10:30:00Z"
         }
     }
     """
@@ -146,23 +155,37 @@ class TokenStore:
 
         self._save_tokens()
 
-    def delete_tokens(self, user_id: str) -> None:
+    def delete_tokens(self, user_id: str, provider: str = "gmail") -> None:
         """
         Delete tokens for a user (disconnect).
 
         Args:
             user_id: User identifier
+            provider: Provider to disconnect (gmail, jira, or "all" for all)
         """
-        if user_id in self._tokens:
-            del self._tokens[user_id]
-            self._save_tokens()
+        if user_id not in self._tokens:
+            return
 
-    def get_connection_status(self, user_id: str) -> Dict[str, Any]:
+        if provider == "all":
+            del self._tokens[user_id]
+        elif provider == "jira" and "jira" in self._tokens[user_id]:
+            del self._tokens[user_id]["jira"]
+            # If no providers left, delete user entry
+            if not self._tokens[user_id]:
+                del self._tokens[user_id]
+        elif provider == "gmail":
+            # Remove the main email tokens
+            del self._tokens[user_id]
+
+        self._save_tokens()
+
+    def get_connection_status(self, user_id: str, provider: str = "gmail") -> Dict[str, Any]:
         """
-        Check if a user has a connected email account.
+        Check if a user has a connected account for a specific provider.
 
         Args:
             user_id: User identifier
+            provider: Provider name (gmail, jira)
 
         Returns:
             Dict with connection status
@@ -171,10 +194,26 @@ class TokenStore:
             return {
                 "is_connected": False,
                 "email_address": None,
-                "provider": None
+                "provider": None,
+                "base_url": None,
+                "username": None
             }
 
         data = self._tokens[user_id]
+
+        # Check for Jira provider
+        if provider == "jira" and "jira" in data:
+            jira_data = data["jira"]
+            return {
+                "is_connected": True,
+                "email_address": jira_data.get("email"),
+                "base_url": jira_data.get("base_url"),
+                "username": jira_data.get("username"),
+                "provider": "jira",
+                "connected_at": jira_data.get("created_at")
+            }
+
+        # Default to Gmail (email)
         return {
             "is_connected": True,
             "email_address": data["email_address"],
