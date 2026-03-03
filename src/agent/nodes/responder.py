@@ -11,7 +11,8 @@ async def respond(state: AgentState) -> Dict[str, Any]:
     """
     messages = state["messages"]
     intent = state.get("intent", "unknown")
-    
+    memory_context = state.get("memory_context", "")
+
     # Tool results might be in state["tool_results"] if they were executed as part of a plan
     # Or they might be appended as ToolMessages in state["messages"].
     # For now, let's assume we pass the explicit "tool_results" list for context summary.
@@ -29,6 +30,7 @@ async def respond(state: AgentState) -> Dict[str, Any]:
     response = await chain.ainvoke({
         "messages": messages,
         "intent": intent,
+        "memory_context": memory_context,
         "tool_results": str(tool_results)
     })
     

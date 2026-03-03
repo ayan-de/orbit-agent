@@ -107,6 +107,7 @@ class PlannerNode:
 
     async def create_plan(self, state: AgentState, max_steps: int = 5) -> Plan:
         """Create an execution plan from user's request."""
+        memory_context = state.get("memory_context", "")
         if not state["messages"]:
             return Plan(steps=[], goal="No user message to plan for")
 
@@ -124,9 +125,9 @@ class PlannerNode:
         logger.info(f"Creating plan for: {user_request[:100]}...")
 
         if await self._is_single_step(state, str(user_request)):
-            return await self._create_simple_plan(str(user_request), max_steps)
+            return await self._create_simple_plan(str(user_request), max_steps, memory_context)
 
-        return await self._create_multi_step_plan(state, str(user_request), max_steps)
+        return await self._create_multi_step_plan(state, str(user_request), max_steps, memory_context)
 
     async def _is_single_step(self, state: AgentState, user_request: str) -> bool:
         """Determine if the request is a simple single-step task."""
@@ -147,13 +148,27 @@ class PlannerNode:
 
         return False
 
-    async def _create_simple_plan(self, user_request: str, max_steps: int = 3) -> Plan:
+    async def _create_simple_plan(
+        self, user_request: str, max_steps: int = 3, memory_context: str = ""
+    ) -> Plan:
         """Create a simple plan (1-2 steps)."""
         llm = self._get_llm(temperature=0.2)
         tools_description = self._get_available_tools_description()
         tool_names = self._get_registry().get_tool_names()
 
         system_prompt = f"""You are an AI assistant. Create a simple execution plan for the user's request.
+
+Memory Context:
+{memory_context}
+
+Use this memory context to:
+- Understand user's preferences (programming language, code style, shell preference)
+- Be aware of recent session context and what user was working on
+- Leverage any learned workflows that match current request
+- Maintain consistency with user's communication style
+- Avoid repeating things user already knows
+
+---
 
 User request: "{user_request}"
 
@@ -201,7 +216,8 @@ Guidelines:
             return self._create_fallback_plan(user_request)
 
     async def _create_multi_step_plan(
-        self, state: AgentState, user_request: str, max_steps: int
+        self, state: AgentState, user_request: str, max_steps: int,
+        memory_context: str = ""
     ) -> Plan:
         """Create a multi-step plan for complex tasks."""
         llm = self._get_llm(temperature=0.3)
@@ -209,6 +225,18 @@ Guidelines:
         tool_names = self._get_registry().get_tool_names()
 
         system_prompt = f"""You are an AI assistant that creates execution plans.
+
+Memory Context:
+{memory_context}
+
+Use this memory context to:
+- Understand user's preferences (programming language, code style, shell preference)
+- Be aware of recent session context and what user was working on
+- Leverage any learned workflows that match current request
+- Maintain consistency with user's communication style
+- Avoid repeating things user already knows
+
+---
 
 User request: "{user_request}"
 

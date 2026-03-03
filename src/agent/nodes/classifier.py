@@ -41,7 +41,10 @@ async def classify_intent(state: AgentState) -> Dict[str, Any]:
     chain = classifier_prompt | llm | StrOutputParser()
     
     # Execute the chain
-    intent_str = await chain.ainvoke({"input": user_input})
+    intent_str = await chain.ainvoke({
+        "input": user_input,
+        "memory_context": memory_context
+    })
     
     # Normalize and validate the output
     intent = intent_str.strip().lower()
