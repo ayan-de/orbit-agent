@@ -55,6 +55,7 @@ from src.agent.nodes.email_preview import show_email_preview
 from src.agent.nodes.email_sender import send_email
 from src.agent.nodes.email_refinement import refine_email
 from src.agent.nodes.memory_loader import memory_loader_node
+from src.agent.nodes.session_writer import session_writer_node
 from src.agent.nodes.human_input import (
     human_input_node,
     route_after_confirmation,
@@ -160,6 +161,7 @@ workflow = StateGraph(AgentState)
 # Add all nodes
 workflow.add_node("memory_loader", memory_loader_node)
 workflow.add_node("classifier", classify_intent)
+workflow.add_node("session_writer", session_writer_node)
 workflow.add_node("command_generator", generate_command)
 workflow.add_node("planner", planner)
 workflow.add_node("executor", executor)
@@ -273,8 +275,9 @@ workflow.add_edge("email_refinement", "email_drafter")
 # email_sender → responder (show success message)
 workflow.add_edge("email_sender", "responder")
 
-# responder → END
-workflow.add_edge("responder", END)
+# responder → session_writer → END
+workflow.add_edge("responder", "session_writer")
+workflow.add_edge("session_writer", END)
 
 # Compile graph (checkpointer attached at runtime)
 app = workflow.compile(checkpointer=None)
