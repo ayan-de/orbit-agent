@@ -71,7 +71,7 @@ from src.agent.edges import (
     route_after_email_preview,
     route_after_web_search,
 )
-from src.memory import get_checkpointer
+from src.memory.file_checkpointer import get_file_checkpointer
 
 # Initialize nodes
 planner_node = PlannerNode()
@@ -279,8 +279,8 @@ workflow.add_edge("email_sender", "responder")
 workflow.add_edge("responder", "session_writer")
 workflow.add_edge("session_writer", END)
 
-# Compile graph (checkpointer attached at runtime)
-app = workflow.compile(checkpointer=None)
+# Compile graph with file checkpointer
+app = workflow.compile(checkpointer=get_file_checkpointer())
 
 
 def get_graph():
@@ -298,14 +298,14 @@ async def get_compiled_graph(with_checkpointer: bool = True):
     Get a compiled graph with optional checkpointer.
 
     Args:
-        with_checkpointer: Whether to use PostgreSQL checkpointer
+        with_checkpointer: Whether to use file checkpointer
 
     Returns:
         Compiled LangGraph app
     """
     checkpointer = None
     if with_checkpointer:
-        checkpointer = await get_checkpointer()
+        checkpointer = get_file_checkpointer()
     return workflow.compile(checkpointer=checkpointer)
 
 
