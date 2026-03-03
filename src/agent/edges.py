@@ -2,14 +2,14 @@
 Conditional edge functions for LangGraph workflow.
 
 INTERNAL ROUTING SYSTEM:
-These functions implement the INTERNAL ROUTING logic for the agent's state machine.
+These functions implement INTERNAL ROUTING logic for the agent's state machine.
 
 ARCHITECTURE BOUNDARIES:
-There are TWO distinct routing systems in the Orbit architecture:
+There are TWO distinct routing systems in Orbit architecture:
 
 1. EXTERNAL ROUTING (TypeScript MessageRouterService):
    - Routes: External Chat Platforms → Bridge → Agent
-   - Scope: Routing messages FROM platforms TO the agent system
+   - Scope: Routing messages FROM platforms TO agent system
    - Pattern: Strategy Pattern for platform adapters
    - File: packages/bridge/src/application/adapters/message-router.service.ts
 
@@ -20,25 +20,35 @@ There are TWO distinct routing systems in the Orbit architecture:
    - File: this file (edges.py) + graph.py
 
 ROUTING BOUNDARY:
-- External Router: ENDS at the Python Agent (hands off to agent)
-- Internal Router (this): STARTS at the Python Agent (takes over from external router)
+- External Router: ENDS at Python Agent (hands off to agent)
+- Internal Router: STARTS at Python Agent (takes over from external router)
+
+FLOW:
+User/Chat → MessageRouterService (EXTERNAL) → Python Agent → LangGraph (INTERNAL)
+
+INTERNAL ROUTING RESPONSIBILITIES (this graph):
+- Classify user intent (command, question, workflow, email, web_search)
+- Route to appropriate node based on intent
+- Execute plans if needed (planner → executor → evaluator cycle)
+- Generate responses via responder node
+- Handle email workflow (intent → drafter → preview → sender/refinement)
+- Execute web searches (web_search_node) with proper formatting
+
+EXTERNAL ROUTING DOES NOT:
+- Decide agent intent (that's classifier node's job)
+- Plan multi-step workflows (that's planner node's job)
+- Execute tools (that's executor node's job)
 
 These edge functions decide:
 - Which node to execute next based on current state
 - When to transition between workflow phases
 - When to end the workflow and return a response
-
-NOT EXTERNAL ROUTING:
-- These functions do NOT route between different platforms
-- They do NOT handle platform-specific message formats
-- They do NOT manage WebSocket connections (that's external router's job)
 """
-
 from typing import Literal
 from src.agent.state import AgentState
 
 
-def route_after_classifier(state: AgentState) -> Literal["command_generator", "planner", "email_intent", "responder"]:
+def route_after_classifier(state: AgentState) -> Literal["command_generator", "planner", "email_intent", "web_search", "responder"]:
     """
     Route after classifier based on intent.
 
@@ -46,6 +56,7 @@ def route_after_classifier(state: AgentState) -> Literal["command_generator", "p
     - "workflow" → planner (multi-step task)
     - "command" → command_generator (single shell command, Phase 1 flow)
     - "email" → email_intent (extract email components, then draft)
+    - "web_search" → web_search_node (search the web)
     - "confirmation" → responder (user confirmed action)
     - "unknown" → responder (fallback)
     """
@@ -59,6 +70,8 @@ def route_after_classifier(state: AgentState) -> Literal["command_generator", "p
         return "command_generator"
     elif intent == "email":
         return "email_intent"
+    elif intent == "web_search":
+        return "web_search"
     elif intent == "confirmation":
         return "responder"
     else:
@@ -80,22 +93,6 @@ def route_after_planner(state: AgentState) -> Literal["executor", "responder"]:
         return "executor"
     else:
         return "responder"
-
-
-def route_after_email_drafter(state: AgentState) -> Literal["email_preview", "end"]:
-    """
-    Route after email drafter based on whether a draft was created.
-
-    - Draft created (email_needs_confirmation=True) → email_preview
-    - Error occurred (no Gmail connected, no recipient) → end
-    """
-    needs_confirmation = state.get("email_needs_confirmation", False)
-
-    if needs_confirmation:
-        return "email_preview"
-    else:
-        # Draft wasn't created (error) - send the error message to user directly
-        return "end"
 
 
 def route_after_executor(state: AgentState) -> Literal["evaluator"]:
@@ -130,6 +127,31 @@ def route_after_evaluator(state: AgentState) -> Literal["executor", "planner", "
     else:
         # Unknown outcome, default to responder
         return "responder"
+
+
+def route_after_email_drafter(state: AgentState) -> Literal["email_preview", "end"]:
+    """
+    Route after email drafter based on whether a draft was created.
+
+    - Draft created (email_needs_confirmation=True) → email_preview
+    - Error occurred (no Gmail connected, no recipient) → end
+    """
+    needs_confirmation = state.get("email_needs_confirmation", False)
+
+    if needs_confirmation:
+        return "email_preview"
+    else:
+        # Draft wasn't created (error) - send error message to user directly
+        return "end"
+
+
+def route_after_web_search(state: AgentState) -> Literal["responder"]:
+    """
+    Route after web search node.
+
+    Always go to responder with search results.
+    """
+    return "responder"
 
 
 def should_continue_execution(state: AgentState) -> bool:
@@ -193,10 +215,11 @@ def route_after_email_preview(state: AgentState) -> Literal["email_sender", "ema
     if any(kw in last_message for kw in confirm_keywords):
         return "email_sender"
 
-    # User cancelled
-    cancel_keywords = ["no", "cancel", "abort", "stop", "nevermind", "never mind", "nah", "nope", "n"]
-    if any(kw == last_message or last_message.startswith(kw + " ") or last_message.startswith(kw + ",") for kw in cancel_keywords):
+    # User cancelled - abort
+    cancel_keywords = ["no", "cancel", "abort", "stop", "nevermind", "nah", "nope", "n"]
+    if any(kw == last_message or last_message.startswith(kw + " ") or last_message.startswith(kw + ",")) for kw in cancel_keywords):
         return "responder"
 
+    # User wants to modify - go to refinement
     # User wants to modify - go to refinement
     return "email_refinement"

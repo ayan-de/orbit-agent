@@ -1,16 +1,16 @@
 """
 LangGraph workflow definition for Orbit AI Agent.
 
-Defines the complete state graph with nodes and conditional edges.
+Defines complete state graph with nodes and conditional edges.
 
 ARCHITECTURE NOTE - INTERNAL ROUTING:
-This graph implements the INTERNAL ROUTING system for the agent.
+This graph implements INTERNAL ROUTING system for agent.
 
-There are TWO distinct routing systems in the Orbit architecture:
+There are TWO distinct routing systems in Orbit architecture:
 
 1. EXTERNAL ROUTING (TypeScript MessageRouterService):
    - Routes: External Chat Platforms → Bridge → Agent
-   - Scope: Routing messages FROM platforms TO the agent system
+   - Scope: Routing messages FROM platforms TO agent system
    - Pattern: Strategy Pattern for platform adapters
    - File: packages/bridge/src/application/adapters/message-router.service.ts
 
@@ -21,27 +21,28 @@ There are TWO distinct routing systems in the Orbit architecture:
    - File: this file (graph.py)
 
 ROUTING BOUNDARY:
-- External Router: ENDS at the Python Agent (hands off to agent)
-- Internal Router: STARTS at the Python Agent (takes over from external router)
+- External Router: ENDS at Python Agent (hands off to agent)
+- Internal Router: STARTS at Python Agent (takes over from external router)
 
 FLOW:
 User/Chat → MessageRouterService (EXTERNAL) → Python Agent → LangGraph (INTERNAL)
 
 INTERNAL ROUTING RESPONSIBILITIES (this graph):
-- Classify user intent (command, question, workflow, email)
+- Classify user intent (command, question, workflow, email, web_search)
 - Route to appropriate node based on intent
 - Execute plans if needed (planner → executor → evaluator cycle)
 - Generate responses via responder node
 - Handle email workflow (intent → drafter → preview → sender/refinement)
+- Execute web searches (web_search_node) with proper formatting
 
 EXTERNAL ROUTING DOES NOT:
 - Decide agent intent (that's classifier node's job)
 - Plan multi-step workflows (that's planner node's job)
 - Execute tools (that's executor node's job)
 """
-
 from typing import Dict, Any, Optional
 from langgraph.graph import StateGraph, END, START
+
 from src.agent.nodes.classifier import classify_intent
 from src.agent.nodes.command_generator import generate_command
 from src.agent.nodes.responder import respond
@@ -58,6 +59,7 @@ from src.agent.nodes.human_input import (
     human_input_node,
     route_after_confirmation,
 )
+from src.agent.nodes.web_search import web_search_node
 from src.agent.state import AgentState
 from src.agent.edges import (
     route_after_classifier,
@@ -65,7 +67,8 @@ from src.agent.edges import (
     route_after_executor,
     route_after_evaluator,
     route_after_email_drafter,
-    route_after_email_preview
+    route_after_email_preview,
+    route_after_web_search,
 )
 from src.memory import get_checkpointer
 
@@ -73,7 +76,6 @@ from src.memory import get_checkpointer
 planner_node = PlannerNode()
 executor_node = ExecutorNode()
 evaluator_node = EvaluatorNode()
-
 
 async def planner(state: AgentState) -> Dict[str, Any]:
     """
@@ -164,6 +166,7 @@ workflow.add_node("executor", executor)
 workflow.add_node("evaluator", evaluator)
 workflow.add_node("responder", respond)
 workflow.add_node("human_input", human_input_node)
+workflow.add_node("web_search", web_search_node)
 # Email nodes
 workflow.add_node("email_intent", classify_email_intent)
 workflow.add_node("email_drafter", draft_email)
@@ -172,13 +175,12 @@ workflow.add_node("email_sender", send_email)
 workflow.add_node("email_refinement", refine_email)
 
 # Define edges
-
 # START → memory_loader → classifier
 workflow.add_edge(START, "memory_loader")
 workflow.add_edge("memory_loader", "classifier")
 
-# classifier → [command_generator | planner | email_intent | responder]
-# Based on intent: "command", "workflow", "email", "question", "confirmation", "unknown"
+# classifier → [command_generator | planner | email_intent | web_search | responder]
+# Based on intent: "command", "workflow", "email", "web_search", "question", "confirmation", "unknown"
 workflow.add_conditional_edges(
     "classifier",
     route_after_classifier,
@@ -186,6 +188,7 @@ workflow.add_conditional_edges(
         "command_generator": "command_generator",
         "planner": "planner",
         "email_intent": "email_intent",
+        "web_search": "web_search",
         "responder": "responder"
     }
 )
@@ -238,12 +241,8 @@ workflow.add_conditional_edges(
     }
 )
 
-# responder → END
-workflow.add_edge("responder", END)
-
-# Email workflow edges
 # email_drafter → [email_preview | END]
-# If draft was created (needs confirmation) → preview, otherwise → END (error message preserved)
+# If draft was created (email_needs_confirmation=True) → preview, otherwise → END (error message preserved)
 workflow.add_conditional_edges(
     "email_drafter",
     route_after_email_drafter,
@@ -252,6 +251,9 @@ workflow.add_conditional_edges(
         "end": END
     }
 )
+
+# web_search → responder
+workflow.add_edge("web_search", "responder")
 
 # email_preview → [email_sender | email_refinement | responder]
 # Based on user confirmation: "yes" to send, "cancel" to abort, otherwise refine
@@ -270,6 +272,9 @@ workflow.add_edge("email_refinement", "email_drafter")
 
 # email_sender → responder (show success message)
 workflow.add_edge("email_sender", "responder")
+
+# responder → END
+workflow.add_edge("responder", END)
 
 # Compile graph (checkpointer attached at runtime)
 app = workflow.compile(checkpointer=None)
@@ -298,7 +303,6 @@ async def get_compiled_graph(with_checkpointer: bool = True):
     checkpointer = None
     if with_checkpointer:
         checkpointer = await get_checkpointer()
-
     return workflow.compile(checkpointer=checkpointer)
 
 

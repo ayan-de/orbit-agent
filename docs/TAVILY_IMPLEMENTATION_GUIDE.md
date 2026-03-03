@@ -70,16 +70,16 @@ This guide focuses on integrating Tavily's AI-powered web search into Orbit Agen
 | 3.3 | Implement news search via MCP | `orbit-agent/src/tools/web/tavily.py` | ✅ |
 | 3.4 | Add days parameter for news search | `orbit-agent/src/tools/web/tavily.py` | ✅ |
 | 3.5 | Implement format_news_results method | `orbit-agent/src/tools/web/tavily.py` | ✅ |
-| 3.6 | Create unit test for web search | `orbit-agent/tests/test_tavily_integration.py` | ✅ |
-| 3.7 | Create unit test for news search | `orbit-agent/tests/test_tavily_integration.py` | ✅ |
-| 3.8 | Create unit test with domain filtering | `orbit-agent/tests/test_tavily_integration.py` | ✅ |
-| 3.9 | Create unit test for MCP connection error | `orbit-agent/tests/test_tavily_integration.py` | ✅ |
+| 3.6 | Create unit test for web search | `orbit-agent/tests/tools/test_tavily.py` | ✅ |
+| 3.7 | Create unit test for news search | `orbit-agent/tests/tools/test_tavily.py` | ✅ |
+| 3.8 | Create unit test with domain filtering | `orbit-agent/tests/tools/test_tavily.py` | ✅ |
+| 3.9 | Create unit test for MCP connection error | `orbit-agent/tests/tools/test_tavily.py` | ✅ |
 | 3.10 | Add include_domains parameter | `orbit-agent/src/tools/web/tavily.py` | ✅ |
 | 3.11 | Add exclude_domains parameter | `orbit-agent/src/tools/web/tavily.py` | ✅ |
 
 ---
 
-## Phase 3: Integration with Agent (Days 3-4)
+## Phase 3: Agent Integration (Days 3-4)
 
 **Goal**: Register tool and integrate with agent workflow.
 
@@ -87,26 +87,27 @@ This guide focuses on integrating Tavily's AI-powered web search into Orbit Agen
 
 | Step | Task | File(s) | Status |
 |------|------|---------|--------|
-| 4.1 | Create web module __init__.py | `orbit-agent/src/tools/web/__init__.py` | ⬜ |
-| 4.2 | Export WebSearchTool from __init__.py | `orbit-agent/src/tools/web/__init__.py` | ⬜ |
-| 4.3 | Export NewsSearchTool from __init__.py | `orbit-agent/src/tools/web/__init__.py` | ⬜ |
-| 4.4 | Import WebSearchTool in registry | `orbit-agent/src/tools/registry.py` | ⬜ |
-| 4.5 | Register WebSearchTool in get_tool_registry | `orbit-agent/src/tools/registry.py` | ⬜ |
-| 4.6 | Register NewsSearchTool in get_tool_registry | `orbit-agent/src/tools/registry.py` | ⬜ |
-| 4.7 | Test tool retrieval from registry | `orbit-agent/tests/tools/test_tavily.py` | ⬜ |
-| 4.8 | Test tool metadata | `orbit-agent/tests/tools/test_tavily.py` | ⬜ |
+| 4.1 | Create web module __init__.py | `orbit-agent/src/tools/web/__init__.py` | ✅ |
+| 4.2 | Export WebSearchTool from __init__.py | `orbit-agent/src/tools/web/__init__.py` | ✅ |
+| 4.3 | Export NewsSearchTool from __init__.py | `orbit-agent/src/tools/web/__init__.py` | ✅ |
+| 4.4 | Import WebSearchTool in registry | `orbit-agent/src/tools/registry.py` | ✅ |
+| 4.5 | Register WebSearchTool in get_tool_registry | `orbit-agent/src/tools/registry.py` | ✅ |
+| 4.6 | Register NewsSearchTool in get_tool_registry | `orbit-agent/src/tools/registry.py` | ✅ |
+| 4.7 | Test tool retrieval from registry | `orbit-agent/tests/tools/test_tavily.py` | ✅ |
+| 4.8 | Test tool metadata | `orbit-agent/tests/tools/test_tavily.py` | ✅ |
 
 ### Day 4: Agent Integration
 
 | Step | Task | File(s) | Status |
 |------|------|---------|--------|
-| 5.1 | Test web_search tool execution | `orbit-agent/tests/tools/test_tavily.py` | ⬜ |
-| 5.2 | Verify results formatting includes citations | `orbit-agent/tests/tools/test_tavily.py` | ⬜ |
-| 5.3 | Verify results include sources | `orbit-agent/tests/tools/test_tavily.py` | ⬜ |
-| 5.4 | Update system prompt with web search | `orbit-agent/src/agent/prompts/system.md` | ⬜ |
-| 5.5 | Document web search capability in prompt | `orbit-agent/src/agent/prompts/system.md` | ⬜ |
-| 5.6 | Add usage examples to prompt | `orbit-agent/src/agent/prompts/system.md` | ⬜ |
-| 5.7 | Add citation guidelines to prompt | `orbit-agent/src/agent/prompts/system.md` | ⬜ |
+| 5.1 | Test web_search tool execution | `orbit-agent/tests/tools/test_tavily_integration.py` | ✅ |
+| 5.2 | Verify results formatting includes citations | `orbit-agent/tests/tools/test_tavily_integration.py` | ✅ |
+| 5.3 | Verify results include sources | `orbit-agent/tests/tools/test_tavily_integration.py` | ✅ |
+| 5.4 | Add web_search intent to classifier | `orbit-agent/src/agent/prompts/classifier.py` | ✅ |
+| 5.5 | Create web_search node | `orbit-agent/src/agent/nodes/web_search.py` | ✅ |
+| 5.6 | Add web_search routing to edges | `orbit-agent/src/agent/edges.py` | ✅ |
+| 5.7 | Add web_search node to graph | `orbit-agent/src/agent/graph.py` | ✅ |
+| 5.8 | Connect web_search node to workflow | `orbit-agent/src/agent/graph.py` | ✅ |
 
 ---
 
@@ -198,10 +199,10 @@ This guide focuses on integrating Tavily's AI-powered web search into Orbit Agen
 ```
 Phase 1: Configuration & Foundation    ██████████  11/11 steps
 Phase 2: MCP Tool Implementation       ██████████  21/21 steps
-Phase 3: Agent Integration             ░░░░░░░   0/15 steps
+Phase 3: Agent Integration             ██████████  15/15 steps
 Phase 4: MCP Server Setup & Docs       ░░░░░░░   0/14 steps
 ────────────────────────────────────────────
-Total                                  ███████░░   32/61 steps
+Total                                  ████████░   47/61 steps
 ```
 
 ---
@@ -222,19 +223,25 @@ orbit-agent/
 │   │   │   ├── __init__.py
 │   │   │   └── tavily.py              # Tavily search tools via MCP
 │   │   └── registry.py                # Register web search tools
-│   └── agent/
-│       └── prompts/
-│           └── system.md              # Update with web search docs
+│   ├── agent/
+│   │   ├── prompts/
+│   │   │   └── classifier.py          # Updated with web_search intent
+│   │   ├── nodes/
+│   │   │   └── web_search.py          # NEW - Web search node
+│   │   └── edges.py                  # Updated with web_search routing
+│   └── graph.py                        # Updated with web_search node
 ├── tests/
 │   ├── tools/
 │   │   └── test_tavily.py             # Tavily tool tests
+│   ├── test_tavily_integration.py     # NEW - Integration tests
 │   └── mcp/                           # NEW - MCP tests
 │       ├── __init__.py
 │       └── test_client.py             # MCP client tests
 ├── docs/
 │   ├── MCP_SETUP.md                   # NEW - MCP server setup guide
 │   ├── MCP_TOOLS.md                   # NEW - MCP tool pattern docs
-│   └── TAVILY_TROUBLESHOOTING.md      # Troubleshooting guide
+│   ├── TAVILY_TROUBLESHOOTING.md      # Troubleshooting guide
+│   └── TAVILY_IMPLEMENTATION_PHASE3.md   # Phase 3 details
 └── .env                               # Add TAVILY_API_KEY
 ```
 
@@ -288,7 +295,7 @@ After core features are complete, consider adding:
 1. ✅ Get Tavily API key from https://tavily.com/
 2. ✅ Phase 1: Configuration & Tool Foundation (COMPLETED)
 3. ✅ Phase 2: MCP Tool Implementation (COMPLETED)
-4. ⏭️ Implement Phase 3: Agent Integration
+4. ✅ Phase 3: Agent Integration (COMPLETED)
 5. ⏭️ Implement Phase 4: MCP Server Setup & Documentation
 6. ⏭️ Test end-to-end
 7. ⏭️ Deploy to environment
