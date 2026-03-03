@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     # MCP Settings (Model Context Protocol)
     MCP_SERVERS_ENABLED: bool = True  # Enable MCP server connections
     MCP_SERVER_TIMEOUT: int = 30  # MCP server connection timeout
-    MCP_TAVILY_SERVER_URL: str = "sse://tavily-mcp-server"  # Tavily MCP server endpoint
+    MCP_SERVERS: dict = {}  # MCP server configurations by name
 
     # Frontend Settings
     FRONTEND_URL: str = "http://localhost:3000"

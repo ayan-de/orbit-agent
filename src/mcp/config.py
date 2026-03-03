@@ -63,6 +63,64 @@ DEFAULT_SERVERS: Dict[str, MCPServerConfig] = {
 }
 
 
+def update_server_from_settings(server_name: str, url: str, enabled: bool = True) -> MCPServerConfig:
+    """
+    Update or add a server configuration from settings.
+
+    Args:
+        server_name: Name of the server
+        url: Server URL or connection string
+        enabled: Whether the server is enabled
+
+    Returns:
+        Updated or created server config
+    """
+    servers = DEFAULT_SERVERS.copy()
+
+    if enabled:
+        servers[server_name] = MCPServerConfig(
+            name=server_name,
+            url=url,
+            transport="http" if url.startswith("http") else "sse",
+            enabled=enabled,
+            timeout=30,
+        )
+    else:
+        # If disabled, remove from defaults
+        if server_name in servers:
+            del servers[server_name]
+
+    return servers[server_name]
+
+
+def get_all_servers() -> Dict[str, MCPServerConfig]:
+    """
+    Get all MCP server configurations, including overrides from settings.
+
+    Returns:
+        Dictionary of server name to config
+    """
+    from src.config import settings
+
+    # Start with defaults
+    servers = DEFAULT_SERVERS.copy()
+
+    # Override with settings.MCP_SERVERS if provided
+    if settings.MCP_SERVERS:
+        for server_name, url in settings.MCP_SERVERS.items():
+            if url:  # Only override if URL is provided
+                servers[server_name] = MCPServerConfig(
+                    name=server_name,
+                    url=url,
+                    transport="http" if url.startswith("http") else "sse",
+                    enabled=True,
+                    timeout=settings.MCP_SERVER_TIMEOUT or 30,
+                )
+
+    # Return only enabled servers
+    return {name: config for name, config in servers.items() if config.enabled}
+
+
 def get_mcp_server_config(
     server_name: str, custom_config: Optional[MCPServersConfig] = None
 ) -> Optional[MCPServerConfig]:

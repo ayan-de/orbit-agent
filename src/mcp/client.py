@@ -8,11 +8,11 @@ import asyncio
 import json
 import logging
 from typing import Optional, Dict, Any, List
-from urllib.parse import urljoin
 
 import httpx
 
-from .config import MCPServerConfig, get_mcp_server_config
+from .config import get_all_servers, update_server_from_settings
+from src.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +42,48 @@ class MCPClientManager:
             self._http_client = httpx.AsyncClient(timeout=30.0)
         return self._http_client
 
-    async def close(self):
-        """Close all connections and HTTP client."""
+    async def initialize_servers(self) -> bool:
+        """
+        Initialize all enabled MCP servers from configuration.
+
+        This ensures that servers are configured and ready before use.
+
+        Returns:
+            True if at least one server initialized, False otherwise
+        """
+        servers = get_all_servers()
+
+        if not servers:
+            logger.warning("No MCP servers configured")
+            return False
+
+        initialized_count = 0
+        for server_name, server_config in servers.items():
+            try:
+                logger.info(f"Initializing MCP server: {server_name}")
+                await self.connect_server(server_name)
+                initialized_count += 1
+            except Exception as e:
+                logger.error(f"Failed to initialize MCP server '{server_name}': {e}")
+                # Continue with other servers
+
+        logger.info(f"Initialized {initialized_count}/{len(servers)} MCP servers")
+        return initialized_count > 0
+
+    async def shutdown_servers(self):
+        """
+        Shutdown all MCP server connections.
+
+        Called during application shutdown to clean up connections.
+        """
+        for server_name in list(self._connections.keys()):
+            try:
+                await self.disconnect_server(server_name)
+                logger.info(f"Shut down MCP server: {server_name}")
+            except Exception as e:
+                logger.error(f"Error shutting down MCP server '{server_name}': {e}")
+
+        # Close HTTP client
         if self._http_client:
             await self._http_client.aclose()
             self._http_client = None
@@ -61,7 +101,7 @@ class MCPClientManager:
         Raises:
             MCPClientError: If connection fails
         """
-        from src.config import settings
+        from .config import get_mcp_server_config
 
         if server_name in self._connections:
             logger.info(f"MCP server '{server_name}' already connected")
@@ -78,48 +118,12 @@ class MCPClientManager:
         try:
             logger.info(f"Connecting to MCP server '{server_name}' at {config.url}")
 
-            # For SSE transport (Server-Sent Events) or HTTP endpoint
-            if config.transport == "sse" or config.url.startswith("http"):
-                connection = await self._connect_http(config)
-            # For stdio transport (command-line)
-            elif config.transport == "stdio":
-                connection = await self._connect_stdio(config)
-            else:
-                raise MCPClientError(f"Unsupported transport: {config.transport}")
+            # For HTTP/SSE transport
+            client = self._get_http_client()
 
-            self._connections[server_name] = connection
-
-            # Discover tools from the server
-            await self._discover_tools(server_name)
-
-            logger.info(f"Successfully connected to MCP server '{server_name}'")
-            return True
-
-        except Exception as e:
-            logger.error(f"Failed to connect to MCP server '{server_name}': {e}")
-            raise MCPClientError(f"Connection failed: {str(e)}")
-
-    async def _connect_http(self, config: MCPServerConfig) -> Dict[str, Any]:
-        """
-        Connect to MCP server using HTTP/SSE transport.
-
-        For Tavily, we use the SSE endpoint with the API key.
-
-        Args:
-            config: Server configuration
-
-        Returns:
-            Connection object
-        """
-        client = self._get_http_client()
-
-        # Use the URL directly (for Tavily, it includes the API key)
-        url = config.url
-
-        # Test connection by sending a ping/initialize request
-        try:
+            # Test connection by sending initialize request
             response = await client.post(
-                url,
+                config.url,
                 json={
                     "jsonrpc": "2.0",
                     "id": 1,
@@ -141,34 +145,29 @@ class MCPClientManager:
             if "error" in result:
                 raise MCPClientError(f"Initialize failed: {result['error']}")
 
-            logger.info(f"Successfully connected to MCP server via HTTP/SSE")
+            logger.info(f"Successfully connected to MCP server '{server_name}' via HTTP/SSE")
 
-            return {
+            # Store connection with client
+            self._connections[server_name] = {
                 "transport": "http",
-                "url": url,
+                "url": config.url,
                 "client": client,
-                "initialized": True
+                "initialized": True,
+                "timeout": config.timeout,
             }
 
+            # Discover tools from the server
+            await self._discover_tools(server_name)
+
+            logger.info(f"Successfully connected to MCP server '{server_name}'")
+            return True
+
         except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error connecting to MCP server '{server_name}': {e.response.status_code} - {e.response.text}")
             raise MCPClientError(f"HTTP error: {e.response.status_code} - {e.response.text}")
         except Exception as e:
-            raise MCPClientError(f"Connection error: {str(e)}")
-
-    async def _connect_stdio(self, config: MCPServerConfig) -> Dict[str, Any]:
-        """
-        Connect to MCP server using stdio transport.
-
-        Args:
-            config: Server configuration
-
-        Returns:
-            Connection object
-        """
-        # Note: This is a placeholder implementation
-        # In production, spawn the subprocess and communicate via stdio
-        logger.debug(f"Simulating stdio connection to {config.url}")
-        return {"transport": "stdio", "url": config.url}
+            logger.error(f"Failed to connect to MCP server '{server_name}': {e}")
+            raise MCPClientError(f"Connection failed: {str(e)}")
 
     async def _send_request(
         self,
@@ -180,7 +179,7 @@ class MCPClientManager:
         Send a JSON-RPC request to an MCP server.
 
         Args:
-            server_name: Name of the server
+            server_name: Name of server
             method: RPC method name
             params: Method parameters
 
@@ -256,37 +255,47 @@ class MCPClientManager:
         except Exception as e:
             logger.warning(f"Failed to discover tools from '{server_name}': {e}")
             # Fallback to mock tools if discovery fails
-            tools = []
+            self._use_fallback_tools(server_name)
 
-            if server_name == "tavily":
-                tools = [
-                    {
-                        "name": "search",
-                        "description": "Search the web using Tavily",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "query": {"type": "string", "description": "Search query"},
-                                "max_results": {"type": "integer", "default": 10},
-                                "search_depth": {"type": "string", "default": "basic"},
-                                "include_domains": {"type": "array", "items": {"type": "string"}},
-                                "exclude_domains": {"type": "array", "items": {"type": "string"}},
-                            },
+    def _use_fallback_tools(self, server_name: str):
+        """
+        Use fallback tool definitions when MCP discovery fails.
+
+        Args:
+            server_name: Name of the server
+        """
+        logger.warning(f"Using fallback tools for '{server_name}'")
+
+        # Mock tools for Tavily
+        if server_name == "tavily":
+            tools = [
+                {
+                    "name": "search",
+                    "description": "Search web using Tavily",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "description": "Search query"},
+                            "max_results": {"type": "integer", "default": 10},
+                            "search_depth": {"type": "string", "default": "basic"},
+                            "include_domains": {"type": "array", "items": {"type": "string"}},
+                            "exclude_domains": {"type": "array", "items": {"type": "string"}},
                         },
                     },
-                    {
-                        "name": "search_news",
-                        "description": "Search for news using Tavily",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "query": {"type": "string", "description": "Search query"},
-                                "max_results": {"type": "integer", "default": 10},
-                                "days": {"type": "integer", "default": 3},
-                            },
+                },
+                {
+                    "name": "search_news",
+                    "description": "Search for news using Tavily",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "description": "Search query"},
+                            "max_results": {"type": "integer", "default": 10},
+                            "days": {"type": "integer", "default": 3},
                         },
                     },
-                ]
+                },
+            ]
 
             for tool in tools:
                 tool_key = f"{server_name}.{tool['name']}"
@@ -295,7 +304,7 @@ class MCPClientManager:
                     "tool": tool,
                 }
 
-            logger.info(f"Using fallback tools for '{server_name}'")
+            logger.info(f"Loaded {len(tools)} fallback tools for '{server_name}'")
 
     async def execute_tool(
         self, server_name: str, tool_name: str, **kwargs
@@ -304,8 +313,8 @@ class MCPClientManager:
         Execute a tool on an MCP server.
 
         Args:
-            server_name: Name of the server
-            tool_name: Name of the tool to execute
+            server_name: Name of server
+            tool_name: Name of tool to execute
             **kwargs: Tool parameters
 
         Returns:
@@ -327,7 +336,7 @@ class MCPClientManager:
         )
 
         try:
-            # Call the tool using MCP protocol
+            # Call tool using MCP protocol
             result = await self._send_request(
                 server_name,
                 f"tools/call",
@@ -337,7 +346,7 @@ class MCPClientManager:
                 }
             )
 
-            # Extract the content from the result
+            # Extract content from the result
             content = result.get("content", [])
             if content and isinstance(content, list):
                 # First content item is typically the result
@@ -377,12 +386,15 @@ class MCPClientManager:
 
         try:
             logger.info(f"Disconnecting from MCP server '{server_name}'")
+
             # Clean up connection
             del self._connections[server_name]
             # Remove tools from this server
             self._tools = {
-                k: v for k, v in self._tools.items() if v["server"] != server_name
+                k: v for k, v in self._tools.items()
+                if v.get("server") != server_name
             }
+
             logger.info(f"Disconnected from MCP server '{server_name}'")
             return True
 
@@ -404,13 +416,18 @@ class MCPClientManager:
             return [
                 v["tool"]
                 for k, v in self._tools.items()
-                if v["server"] == server_name
+                if v.get("server") == server_name
             ]
         return [v["tool"] for v in self._tools.values()]
 
     def is_server_connected(self, server_name: str) -> bool:
         """Check if a server is connected."""
         return server_name in self._connections
+
+    def is_server_initialized(self, server_name: str) -> bool:
+        """Check if a server is initialized and connected."""
+        connection = self._connections.get(server_name)
+        return connection is not None and connection.get("initialized", False)
 
 
 # Global MCP client manager instance
