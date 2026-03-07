@@ -22,7 +22,13 @@ NC='\033[0m' # No Color
 
 VERSION="${VERSION:-latest}"
 OUTPUT_DIR="${OUTPUT_DIR:-./releases}"
+# Convert OUTPUT_DIR to absolute path immediately
+mkdir -p "$OUTPUT_DIR"
+OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
+
 ORBIT_AGENT_DIR="${ORBIT_AGENT_DIR:-.}"
+ORBIT_AGENT_DIR="$(cd "$ORBIT_AGENT_DIR" && pwd)"
+
 CLAWDBOT_DIR="${CLAWDBOT_DIR:-../clawdbotClone}"
 
 # Detect platform
@@ -512,10 +518,10 @@ create_release_archive() {
 
     log_info "Creating release archive: $archive_name"
 
-    cd "$source_dir"
-
     # Create archive
-    tar -czf "$OUTPUT_DIR/$archive_name" -C "$source_dir/.." "$(basename "$source_dir")"
+    # Use -C logically to avoid path issues
+    cd "$source_dir/.."
+    tar -czf "$OUTPUT_DIR/$archive_name" "$(basename "$source_dir")"
 
     # Generate checksum
     log_info "Generating checksum..."
@@ -566,7 +572,7 @@ main() {
 
     # Build components
     build_python_agent "$BUILD_DIR"
-    build_nodejs_components "$BUILD_DIR"
+    # build_nodejs_components "$BUILD_DIR" # Decoupled! handled by clawdbotClone repo
     create_installer_scripts "$BUILD_DIR"
 
     # Create release archive
