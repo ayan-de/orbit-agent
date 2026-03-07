@@ -92,8 +92,15 @@ async def invoke_agent(request: AgentRequest):
             "content_source": None,
         }
         
+        # Config for checkpointer (required when using memory)
+        config = {
+            "configurable": {
+                "thread_id": request.session_id,
+            }
+        }
+
         # Invoke the graph
-        final_state = await agent_app.ainvoke(initial_state)
+        final_state = await agent_app.ainvoke(initial_state, config=config)
 
         # Extract response
         messages = final_state.get("messages", [])
@@ -203,8 +210,15 @@ async def stream_agent(websocket: WebSocket):
         previous_step = 0
         previous_evaluation = None
 
+        # Config for checkpointer (required when using memory)
+        config = {
+            "configurable": {
+                "thread_id": session_id,
+            }
+        }
+
         # Stream execution with updates
-        async for event in agent_app.astream(initial_state):
+        async for event in agent_app.astream(initial_state, config=config):
             # Check for intent changes
             current_intent = event.get("intent")
             if current_intent != previous_intent:

@@ -36,14 +36,16 @@ async def classify_intent(state: AgentState) -> Dict[str, Any]:
     # Initialize LLM
     # We use a lower temperature for classification to be deterministic
     llm = llm_factory(temperature=0)
-    
+
     # Create the chain
     chain = classifier_prompt | llm | StrOutputParser()
-    
+
     # Execute the chain
+    # Note: memory_context is not fully implemented yet (Phase 2)
+    # Using placeholder for now
     intent_str = await chain.ainvoke({
         "input": user_input,
-        "memory_context": memory_context
+        "memory_context": "No memory context available (Phase 1)"
     })
     
     # Normalize and validate the output

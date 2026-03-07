@@ -176,6 +176,7 @@ class FileCheckpointSaver(BaseCheckpointSaver):
         config: RunnableConfig,
         checkpoint: Checkpoint,
         metadata: CheckpointMetadata,
+        new_versions: Optional[Dict[str, str]] = None,
     ) -> RunnableConfig:
         """
         Save checkpoint to file.
@@ -184,6 +185,7 @@ class FileCheckpointSaver(BaseCheckpointSaver):
             config: Runnable configuration
             checkpoint: Checkpoint to save
             metadata: Checkpoint metadata
+            new_versions: Optional dictionary of new versions for channels
 
         Returns:
             Updated configuration with checkpoint ID
