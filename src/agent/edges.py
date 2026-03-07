@@ -217,7 +217,7 @@ def route_after_email_preview(state: AgentState) -> Literal["email_sender", "ema
 
     # User cancelled - abort
     cancel_keywords = ["no", "cancel", "abort", "stop", "nevermind", "nah", "nope", "n"]
-    if any(kw == last_message or last_message.startswith(kw + " ") or last_message.startswith(kw + ",")) for kw in cancel_keywords):
+    if any(kw == last_message or last_message.startswith(kw + " ") or last_message.startswith(kw + ",") for kw in cancel_keywords):
         return "responder"
 
     # User wants to modify - go to refinement

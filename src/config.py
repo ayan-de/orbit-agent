@@ -47,6 +47,16 @@ class Settings(BaseSettings):
     MCP_SERVER_TIMEOUT: int = 30  # MCP server connection timeout
     MCP_SERVERS: dict = {}  # MCP server configurations by name
 
+    # Google Workspace MCP Settings
+    GOOGLE_OAUTH_CLIENT_ID: Optional[str] = None  # Google OAuth Client ID
+    GOOGLE_OAUTH_CLIENT_SECRET: Optional[str] = None  # Google OAuth Client Secret
+    OAUTHLIB_INSECURE_TRANSPORT: str = "1"  # Allow HTTP transport for OAuth
+    MCP_ENABLE_OAUTH21: bool = False  # Enable OAuth 2.1 mode for multi-user
+    EXTERNAL_OAUTH21_PROVIDER: bool = False  # External OAuth provider mode
+    WORKSPACE_MCP_BASE_URI: str = "http://localhost"  # MCP server base URI
+    WORKSPACE_MCP_PORT: str = "8000"  # MCP server port
+    WORKSPACE_MCP_HOST: str = "0.0.0.0"  # MCP server host
+
     # Frontend Settings
     FRONTEND_URL: str = "http://localhost:3000"
 

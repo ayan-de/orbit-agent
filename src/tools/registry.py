@@ -17,7 +17,6 @@ from src.tools.file_ops import (
     CreateDirectoryTool,
     DeletePathTool,
 )
-from src.tools.gmail.send import SendEmailTool
 from src.tools.jira.list_tickets import ListTicketsTool
 from src.tools.jira.get_ticket import GetTicketDetailsTool
 from src.tools.jira.transition import TransitionTicketTool
@@ -365,8 +364,6 @@ def get_tool_registry() -> ToolRegistry:
         _global_registry.register_tool(WriteFileTool)
         _global_registry.register_tool(CreateDirectoryTool)
         _global_registry.register_tool(DeletePathTool)
-        # Register Gmail tools
-        _global_registry.register_tool(SendEmailTool)
         # Register Jira tools
         _global_registry.register_tool(ListTicketsTool)
         _global_registry.register_tool(GetTicketDetailsTool)
