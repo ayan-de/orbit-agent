@@ -142,13 +142,10 @@ build_python_agent() {
     if [ -f "$ORBIT_AGENT_DIR/README.md" ]; then
         cp "$ORBIT_AGENT_DIR/README.md" "$target_dir/"
     fi
-    if [ -f "$ORBIT_AGENT_DIR/CLAUDE.md" ]; then
-        cp "$ORBIT_AGENT_DIR/CLAUDE.md" "$target_dir/"
-    fi
-
     # Create start script that handles venv creation
     cat > "$target_dir/start_agent.sh" << 'EOF'
 #!/bin/bash
+set -e
 # Find the script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -164,13 +161,12 @@ else
     source .venv/bin/activate
 fi
 
-# Set PYTHONPATH
+# Set PYTHONPATH to include the src folder
 export PYTHONPATH="$SCRIPT_DIR/src:$PYTHONPATH"
 
 # Start the agent
-python -m src.main
+exec python -m src.main
 EOF
-
     chmod +x "$target_dir/start_agent.sh"
 
     log_success "Python Agent packaged successfully"
@@ -548,13 +544,13 @@ main() {
     setup_build_dirs
 
     # Create temporary build directory
-    BUILD_DIR="$OUTPUT_DIR/temp/orbit-agent-${VERSION}-${PLATFORM}-${ARCH}"
+    # IMPORTANT: Don't put version in the directory name, the tarball will have it
+    BUILD_DIR="$OUTPUT_DIR/temp/orbit-agent"
     rm -rf "$BUILD_DIR"
     mkdir -p "$BUILD_DIR"
 
     # Build components
     build_python_agent "$BUILD_DIR"
-    # build_nodejs_components "$BUILD_DIR" # Decoupled! handled by clawdbotClone repo
     create_installer_scripts "$BUILD_DIR"
 
     # Create release archive

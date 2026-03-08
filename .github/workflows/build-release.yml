@@ -224,19 +224,16 @@ jobs:
             exit 1
           fi
 
-          if [ ! -f "$extracted_dir/install.sh" ]; then
-            echo "ERROR: install.sh not found"
+          if [ ! -f "$extracted_dir/requirements.txt" ]; then
+            echo "ERROR: requirements.txt not found"
             exit 1
           fi
 
-          if [ ! -d "$extracted_dir/.venv" ]; then
-            echo "ERROR: Python venv not found"
+          # Verify start script exists
+          if [ ! -f "$extracted_dir/start_agent.sh" ]; then
+            echo "ERROR: start_agent.sh not found"
             exit 1
           fi
-
-          # Test Python environment
-          source "$extracted_dir/activate_venv.sh"
-          python --version
 
           echo "Release verification successful!"
 
