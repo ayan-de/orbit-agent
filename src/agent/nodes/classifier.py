@@ -50,7 +50,7 @@ async def classify_intent(state: AgentState) -> Dict[str, Any]:
     
     # Normalize and validate the output
     intent = intent_str.strip().lower()
-    valid_intents = ["command", "question", "workflow", "email", "confirmation", "jira", "git", "search"]
+    valid_intents = ["command", "question", "workflow", "email", "confirmation", "search"]
     
     if intent not in valid_intents:
         # Fallback for unexpected LLM output

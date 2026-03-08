@@ -33,9 +33,6 @@ class Settings(BaseSettings):
     EMAIL_MAX_SIZE_MB: int = 25
     EMAIL_RATE_LIMIT: int = 10  # Max emails per hour per user
 
-    # Jira Settings
-    JIRA_TIMEOUT: int = 30  # Jira API timeout in seconds
-
     # Tavily Settings (Web Search)
     TAVILY_API_KEY: Optional[str] = None  # Tavily API key for web search
     TAVILY_MAX_RESULTS: int = 10  # Default max results for search

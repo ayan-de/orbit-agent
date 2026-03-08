@@ -35,7 +35,7 @@ Create a complete documentation and help system:
 | Step | Task | File(s) | Status |
 |------|------|---------|--------|
 | 1.1 | Create Command enum | `orbit-agent/src/docs/commands.py` | ⬜ |
-| 1.2 | Define all Jira commands | `orbit-agent/src/docs/commands.py` | ⬜ |
+| 1.2 | Define all Search commands | `orbit-agent/src/docs/commands.py` | ⬜ |
 | 1.3 | Define all Git commands | `orbit-agent/src/docs/commands.py` | ⬜ |
 | 1.4 | Define all File commands | `orbit-agent/src/docs/commands.py` | ⬜ |
 | 1.5 | Define all System commands | `orbit-agent/src/docs/commands.py` | ⬜ |
@@ -86,7 +86,7 @@ Create a complete documentation and help system:
 | Step | Task | File(s) | Status |
 |------|------|---------|--------|
 | 4.1 | Create SETUP_GUIDES.md | `orbit-agent/docs/SETUP_GUIDES.md` | ⬜ |
-| 4.2 | Add Jira setup section | `orbit-agent/docs/SETUP_GUIDES.md` | ⬜ |
+| 4.2 | Add Search integration setup section | `orbit-agent/docs/SETUP_GUIDES.md` | ⬜ |
 | 4.3 | Add Git integration setup section | `orbit-agent/docs/SETUP_GUIDES.md` | ⬜ |
 | 4.4 | Add Web search setup section | `orbit-agent/docs/SETUP_GUIDES.md` | ⬜ |
 | 4.5 | Add configuration setup section | `orbit-agent/docs/SETUP_GUIDES.md` | ⬜ |
@@ -122,7 +122,7 @@ Create a complete documentation and help system:
 | Step | Task | File(s) | Status |
 |------|------|---------|--------|
 | 6.1 | Create Workflow enum | `orbit-agent/src/workflows/types.py` | ⬜ |
-| 6.2 | Define Jira workflows | `orbit-agent/src/workflows/types.py` | ⬜ |
+| 6.2 | Define Search workflows | `orbit-agent/src/workflows/types.py` | ⬜ |
 | 6.3 | Define Git workflows | `orbit-agent/src/workflows/types.py` | ⬜ |
 | 6.4 | Define Deployment workflows | `orbit-agent/src/workflows/types.py` | ⬜ |
 | 6.5 | Define Bug Triage workflows | `orbit-agent/src/workflows/types.py` | ⬜ |
@@ -159,7 +159,7 @@ Create a complete documentation and help system:
 |------|------|---------|--------|
 | 8.1 | Create FAQ.md | `orbit-agent/docs/FAQ.md` | ⬜ |
 | 8.2 | Add Getting Started questions | `orbit-agent/docs/FAQ.md` | ⬜ |
-| 8.3 | Add Jira integration questions | `orbit-agent/docs/FAQ.md` | ⬜ |
+| 8.3 | Add Search integration questions | `orbit-agent/docs/FAQ.md` | ⬜ |
 | 8.4 | Add Git questions | `orbit-agent/docs/FAQ.md` | ⬜ |
 | 8.5 | Add Configuration questions | `orbit-agent/docs/FAQ.md` | ⬜ |
 | 8.6 | Add Security questions | `orbit-agent/docs/FAQ.md` | ⬜ |
