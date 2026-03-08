@@ -112,17 +112,7 @@ setup_build_dirs() {
 build_python_agent() {
     local target_dir="$1"
 
-    log_info "Building Python Agent..."
-
-    # Create Python venv
-    log_info "Creating Python virtual environment..."
-    python3 -m venv "$target_dir/.venv"
-
-    # Activate venv and install dependencies
-    log_info "Installing Python dependencies..."
-    source "$target_dir/.venv/bin/activate"
-    pip install --upgrade pip setuptools wheel
-    pip install -r "$ORBIT_AGENT_DIR/requirements.txt"
+    log_info "Packaging Python Agent..."
 
     # Copy source code
     log_info "Copying Python source code..."
@@ -156,42 +146,34 @@ build_python_agent() {
         cp "$ORBIT_AGENT_DIR/CLAUDE.md" "$target_dir/"
     fi
 
-    # Make venv relocatable
-    log_info "Making venv relocatable..."
-    deactivate
-
-    # Create activation script that fixes paths
-    cat > "$target_dir/activate_venv.sh" << 'EOF'
-#!/bin/bash
-# Find the script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Activate the virtual environment
-source "$SCRIPT_DIR/.venv/bin/activate"
-
-# Set PYTHONPATH
-export PYTHONPATH="$SCRIPT_DIR/src:$PYTHONPATH"
-EOF
-
-    chmod +x "$target_dir/activate_venv.sh"
-
-    # Create start script
+    # Create start script that handles venv creation
     cat > "$target_dir/start_agent.sh" << 'EOF'
 #!/bin/bash
 # Find the script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
-# Activate virtual environment
-source "$SCRIPT_DIR/activate_venv.sh"
+# Check for Python virtual environment
+if [ ! -d ".venv" ]; then
+    echo "Creating Python virtual environment..."
+    python3 -m venv .venv
+    source .venv/bin/activate
+    pip install --upgrade pip setuptools wheel
+    pip install -r requirements.txt
+else
+    source .venv/bin/activate
+fi
+
+# Set PYTHONPATH
+export PYTHONPATH="$SCRIPT_DIR/src:$PYTHONPATH"
 
 # Start the agent
-cd "$SCRIPT_DIR"
 python -m src.main
 EOF
 
     chmod +x "$target_dir/start_agent.sh"
 
-    log_success "Python Agent built successfully"
+    log_success "Python Agent packaged successfully"
 }
 
 ################################################################################
