@@ -21,7 +21,6 @@ build/
 # IDE
 .DS_Store
 .idea/
-.vscode/
 
 # Alembic
 *.db
@@ -30,3 +29,7 @@ build/
 # Data storage (contains encrypted tokens)
 data/
 *.json
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+.gitignore

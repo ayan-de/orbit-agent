@@ -26,15 +26,6 @@ class TokenStore:
             "provider": "gmail",
             "created_at": "2024-02-20T10:30:00Z",
             "updated_at": "2024-02-20T10:30:00Z"
-        },
-        "jira": {
-            "base_url": "https://your-domain.atlassian.net",
-            "email": "user@example.com",
-            "api_token": "encrypted_api_token",
-            "username": "user@example.com",
-            "provider": "jira",
-            "created_at": "2024-02-20T10:30:00Z",
-            "updated_at": "2024-02-20T10:30:00Z"
         }
     }
     """
@@ -161,18 +152,13 @@ class TokenStore:
 
         Args:
             user_id: User identifier
-            provider: Provider to disconnect (gmail, jira, or "all" for all)
+            provider: Provider to disconnect (gmail or "all" for all)
         """
         if user_id not in self._tokens:
             return
 
         if provider == "all":
             del self._tokens[user_id]
-        elif provider == "jira" and "jira" in self._tokens[user_id]:
-            del self._tokens[user_id]["jira"]
-            # If no providers left, delete user entry
-            if not self._tokens[user_id]:
-                del self._tokens[user_id]
         elif provider == "gmail":
             # Remove the main email tokens
             del self._tokens[user_id]
@@ -185,7 +171,7 @@ class TokenStore:
 
         Args:
             user_id: User identifier
-            provider: Provider name (gmail, jira)
+            provider: Provider name (gmail)
 
         Returns:
             Dict with connection status
@@ -200,18 +186,6 @@ class TokenStore:
             }
 
         data = self._tokens[user_id]
-
-        # Check for Jira provider
-        if provider == "jira" and "jira" in data:
-            jira_data = data["jira"]
-            return {
-                "is_connected": True,
-                "email_address": jira_data.get("email"),
-                "base_url": jira_data.get("base_url"),
-                "username": jira_data.get("username"),
-                "provider": "jira",
-                "connected_at": jira_data.get("created_at")
-            }
 
         # Default to Gmail (email)
         return {

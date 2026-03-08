@@ -31,7 +31,7 @@ The Email Tool enables users to compose, preview, and send emails through natura
 - **Multi-step refinement** - modify email content before final send
 - **File attachments** - support for uploaded files
 - **Connected services UI** - show Gmail connection status in Next.js profile
-- **Content generation** - can generate email content from other tools (Jira, web search, etc.)
+- **Content generation** - can generate email content from other tools (web search, git, etc.)
 
 ---
 
@@ -58,9 +58,9 @@ User: "email 'Here is the report' to sakil@gmail.com with this file [uploads rep
 
 ### 3. Generated Content Email (Multi-Source)
 ```
-User: "fetch my jira tickets, summarize them, and email the summary to manager@gmail.com"
-→ Agent: Fetches Jira tickets → Generates summary → Drafts email
-→ Preview shown to user with Jira summary content
+User: "search for top 10 cars, summarize them, and email the summary to manager@gmail.com"
+→ Agent: Searches web for cars → Generates summary → Drafts email
+→ Preview shown to user with car list summary
 → User: "yes send it"
 → Email sent
 ```
@@ -97,7 +97,7 @@ User: "email 'I'll be out tomorrow' to my boss"
 │  ┌─────────────────────────────────────────────────────────────────┐ │
 │  │  Profile Page                                                   │ │
 │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐                      │ │
-│  │  │Telegram  │  │  Gmail   │  │   Jira   │                      │ │
+│  │  │Telegram  │  │  Gmail   │  │   web_search   │                      │ │
 │  │  │  ✓       │  │  ✓       │  │  ✗       │                      │ │
 │  │  │[Connect] │  │[Connect] │  │[Connect] │                      │ │
 │  │  └──────────┘  └──────────┘  └──────────┘                      │ │
@@ -128,7 +128,7 @@ User: "email 'I'll be out tomorrow' to my boss"
 │  ┌─────────────────────────────────────────────────────────────────┐ │
 │  │  Tools Layer (LangChain)                                       │ │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │ │
-│  │  │GmailTool     │  │JiraTool      │  │BrowserTool   │         │ │
+│  │  │GmailTool     │  │web_searchTool      │  │BrowserTool   │         │ │
 │  │  │- list_emails │  │- get_tickets │  │- web_search  │         │ │
 │  │  │- draft_email │  │- get_details │  │- scrape      │         │ │
 │  │  │- send_email  │  └──────────────┘  └──────────────┘         │ │
