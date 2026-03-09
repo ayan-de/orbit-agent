@@ -28,11 +28,10 @@ FLOW:
 User/Chat → MessageRouterService (EXTERNAL) → Python Agent → LangGraph (INTERNAL)
 
 INTERNAL ROUTING RESPONSIBILITIES (this graph):
-- Classify user intent (command, question, workflow, email, web_search)
+- Classify user intent (command, question, workflow, web_search)
 - Route to appropriate node based on intent
 - Execute plans if needed (planner → executor → evaluator cycle)
 - Generate responses via responder node
-- Handle email workflow (intent → drafter → preview → sender/refinement)
 - Execute web searches (web_search_node) with proper formatting
 
 EXTERNAL ROUTING DOES NOT:
@@ -49,11 +48,6 @@ from src.agent.nodes.responder import respond
 from src.agent.nodes.planner import PlannerNode, Plan
 from src.agent.nodes.executor import ExecutorNode
 from src.agent.nodes.evaluator import EvaluatorNode
-from src.agent.nodes.email_intent import classify_email_intent
-from src.agent.nodes.email_drafter import draft_email
-from src.agent.nodes.email_preview import show_email_preview
-from src.agent.nodes.email_sender import send_email
-from src.agent.nodes.email_refinement import refine_email
 from src.agent.nodes.memory_loader import memory_loader_node
 from src.agent.nodes.session_writer import session_writer_node
 from src.agent.nodes.human_input import (
@@ -67,8 +61,6 @@ from src.agent.edges import (
     route_after_planner,
     route_after_executor,
     route_after_evaluator,
-    route_after_email_drafter,
-    route_after_email_preview,
     route_after_web_search,
 )
 from src.memory.file_checkpointer import get_file_checkpointer
@@ -169,34 +161,24 @@ workflow.add_node("evaluator", evaluator)
 workflow.add_node("responder", respond)
 workflow.add_node("human_input", human_input_node)
 workflow.add_node("web_search", web_search_node)
-# Email nodes
-workflow.add_node("email_intent", classify_email_intent)
-workflow.add_node("email_drafter", draft_email)
-workflow.add_node("email_preview", show_email_preview)
-workflow.add_node("email_sender", send_email)
-workflow.add_node("email_refinement", refine_email)
 
 # Define edges
 # START → memory_loader → classifier
 workflow.add_edge(START, "memory_loader")
 workflow.add_edge("memory_loader", "classifier")
 
-# classifier → [command_generator | planner | email_intent | web_search | responder]
-# Based on intent: "command", "workflow", "email", "web_search", "question", "confirmation", "unknown"
+# classifier → [command_generator | planner | web_search | responder]
+# Based on intent: "command", "workflow", "web_search", "question", "confirmation", "unknown"
 workflow.add_conditional_edges(
     "classifier",
     route_after_classifier,
     {
         "command_generator": "command_generator",
         "planner": "planner",
-        "email_intent": "email_intent",
         "web_search": "web_search",
         "responder": "responder"
     }
 )
-
-# email_intent → email_drafter (after extracting email components from user message)
-workflow.add_edge("email_intent", "email_drafter")
 
 # command_generator → responder (Phase 1 flow)
 workflow.add_edge("command_generator", "responder")
@@ -243,37 +225,8 @@ workflow.add_conditional_edges(
     }
 )
 
-# email_drafter → [email_preview | END]
-# If draft was created (email_needs_confirmation=True) → preview, otherwise → END (error message preserved)
-workflow.add_conditional_edges(
-    "email_drafter",
-    route_after_email_drafter,
-    {
-        "email_preview": "email_preview",
-        "end": END
-    }
-)
-
 # web_search → responder
 workflow.add_edge("web_search", "responder")
-
-# email_preview → [email_sender | email_refinement | responder]
-# Based on user confirmation: "yes" to send, "cancel" to abort, otherwise refine
-workflow.add_conditional_edges(
-    "email_preview",
-    route_after_email_preview,
-    {
-        "email_sender": "email_sender",
-        "email_refinement": "email_refinement",
-        "responder": "responder"
-    }
-)
-
-# email_refinement → email_drafter
-workflow.add_edge("email_refinement", "email_drafter")
-
-# email_sender → responder (show success message)
-workflow.add_edge("email_sender", "responder")
 
 # responder → session_writer → END
 workflow.add_edge("responder", "session_writer")

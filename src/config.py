@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     # API Settings
     PORT: int = 8000
     DEBUG: bool = True
-    
+
     # LLM Settings
     OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
@@ -13,25 +13,17 @@ class Settings(BaseSettings):
     GLM_API_KEY: Optional[str] = None
     DEFAULT_LLM_PROVIDER: str = "gemini"
     DEFAULT_LLM_MODEL: Optional[str] = None
-    
+
     # Database Settings
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/orbit_agent"
-    
+
     # Bridge Settings
     BRIDGE_URL: str = "http://localhost:3001"
     BRIDGE_API_KEY: Optional[str] = None
 
-    # Gmail OAuth Settings
-    GMAIL_CLIENT_ID: Optional[str] = None
-    GMAIL_CLIENT_SECRET: Optional[str] = None
-    GMAIL_REDIRECT_URI: str = "http://localhost:3001/auth/gmail/callback"
-    GMAIL_SCOPES: list[str] = ["https://www.googleapis.com/auth/gmail.send"]
-
-    # Email Settings
+    # Token Storage (for OAuth integrations)
     ENCRYPTION_KEY: Optional[str] = None  # For token encryption
     TOKEN_STORAGE_PATH: str = "data/tokens.json"
-    EMAIL_MAX_SIZE_MB: int = 25
-    EMAIL_RATE_LIMIT: int = 10  # Max emails per hour per user
 
     # Tavily Settings (Web Search)
     TAVILY_API_KEY: Optional[str] = None  # Tavily API key for web search
@@ -44,7 +36,7 @@ class Settings(BaseSettings):
     MCP_SERVER_TIMEOUT: int = 30  # MCP server connection timeout
     MCP_SERVERS: dict = {}  # MCP server configurations by name
 
-    # Google Workspace MCP Settings
+    # Google Workspace MCP Settings (for future MCP integrations)
     GOOGLE_OAUTH_CLIENT_ID: Optional[str] = None  # Google OAuth Client ID
     GOOGLE_OAUTH_CLIENT_SECRET: Optional[str] = None  # Google OAuth Client Secret
     OAUTHLIB_INSECURE_TRANSPORT: str = "1"  # Allow HTTP transport for OAuth

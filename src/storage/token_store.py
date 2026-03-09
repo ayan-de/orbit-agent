@@ -1,5 +1,5 @@
 """
-File-based token storage for Gmail OAuth tokens.
+File-based token storage for OAuth tokens.
 Stores encrypted tokens in a JSON file for persistent access.
 """
 import json

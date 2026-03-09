@@ -39,16 +39,7 @@ Use this memory context to:
    - "refactor the auth module to use JWT"
    - "find all unused variables in src folder and remove them"
 
-4. "email": The user wants to send an email. This includes explicit email requests or implicit ones mentioning sending something to someone.
-   Examples:
-   - "email 'Happy birthday' to sakil@gmail.com"
-   - "send an email to my boss"
-   - "email a report to manager@gmail.com"
-   - "mail this to sakil"
-   - "send a summary via email"
-   - "list top 10 cars and mail it to sakil@gmail.com"
-
-5. "web_search": The user is asking for current information, facts, news, or anything that would require searching the web.
+4. "web_search": The user is asking for current information, facts, news, or anything that would require searching the web.
    The agent should use the web_search tool to find up-to-date information.
    Examples:
    - "what's the latest news about AI?"
@@ -62,12 +53,12 @@ Use this memory context to:
    - "what's happening with OpenAI?"
    - "search the web for..."
 
-6. "confirmation": The user is responding to a confirmation request (e.g., "yes", "no", "proceed").
+5. "confirmation": The user is responding to a confirmation request (e.g., "yes", "no", "proceed").
    Examples:
    - "yes, go ahead"
    - "no, cancel"
 
-Output ONLY the category name (command, question, workflow, email, web_search, confirmation) and nothing else.
+Output ONLY the category name (command, question, workflow, web_search, confirmation) and nothing else.
 """
 
 classifier_prompt = ChatPromptTemplate.from_messages([
