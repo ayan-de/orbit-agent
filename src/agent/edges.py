@@ -174,3 +174,16 @@ def should_respond(state: AgentState) -> bool:
     """
     evaluation_outcome = state.get("evaluation_outcome")
     return evaluation_outcome in ["goal_achieved", "fatal_error", "incomplete"]
+
+
+def route_after_smart_router(state: AgentState) -> Literal["classifier", "end"]:
+    """
+    Route after smart_router based on auth requirements.
+
+    - Auth required → end (prompt user to connect integrations)
+    - No auth required → classifier (continue normal flow)
+    """
+    auth_required = state.get("auth_required_integrations")
+    if auth_required:
+        return "end"
+    return "classifier"

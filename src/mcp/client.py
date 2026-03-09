@@ -2,16 +2,18 @@
 MCP (Model Context Protocol) Client Manager
 
 Manages connections to MCP servers and provides tool execution capabilities.
+Supports HTTP/SSE and stdio transports.
 """
 
 import asyncio
 import json
 import logging
+import os
 from typing import Optional, Dict, Any, List
 
 import httpx
 
-from .config import get_all_servers, update_server_from_settings
+from .config import get_all_servers, update_server_from_settings, get_mcp_server_config
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -21,6 +23,85 @@ class MCPClientError(Exception):
     """Exception raised when MCP client operations fail."""
 
     pass
+
+
+class StdioTransport:
+    """
+    Stdio transport for MCP servers.
+
+    Communicates with MCP servers via subprocess stdin/stdout.
+    """
+
+    def __init__(self, command: str, args: List[str], env: Dict[str, str] = None):
+        self.command = command
+        self.args = args or []
+        self.env = {**os.environ, **(env or {})}
+        self.process: Optional[asyncio.subprocess.Process] = None
+        self._request_id = 0
+
+    async def start(self) -> bool:
+        """Start the subprocess and initialize connection."""
+        try:
+            self.process = await asyncio.create_subprocess_exec(
+                self.command,
+                *self.args,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=self.env,
+            )
+            logger.info(f"Started stdio process: {self.command} {' '.join(self.args)}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to start stdio process: {e}")
+            return False
+
+    async def send_request(self, method: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Send JSON-RPC request via stdin and read response from stdout."""
+        if not self.process or not self.process.stdin:
+            raise MCPClientError("Process not started")
+
+        self._request_id += 1
+        request = {
+            "jsonrpc": "2.0",
+            "id": self._request_id,
+            "method": method,
+            "params": params or {}
+        }
+
+        try:
+            # Write request to stdin
+            request_line = json.dumps(request) + "\n"
+            self.process.stdin.write(request_line.encode())
+            await self.process.stdin.drain()
+
+            # Read response from stdout
+            response_line = await self.process.stdout.readline()
+            if not response_line:
+                raise MCPClientError("No response from process")
+
+            response = json.loads(response_line.decode().strip())
+
+            if "error" in response:
+                raise MCPClientError(f"RPC error: {response['error']}")
+
+            return response.get("result", {})
+
+        except json.JSONDecodeError as e:
+            raise MCPClientError(f"Invalid JSON response: {e}")
+        except Exception as e:
+            raise MCPClientError(f"Stdio communication error: {e}")
+
+    async def close(self):
+        """Close the subprocess."""
+        if self.process:
+            try:
+                self.process.terminate()
+                await self.process.wait()
+            except Exception as e:
+                logger.warning(f"Error closing stdio process: {e}")
+            finally:
+                self.process = None
 
 
 class MCPClientManager:
@@ -370,6 +451,64 @@ class MCPClientManager:
             logger.error(f"Tool execution failed: {e}")
             raise MCPClientError(f"Execution failed: {str(e)}")
 
+    async def execute_tool_with_retry(
+        self,
+        server_name: str,
+        tool_name: str,
+        kwargs: Dict[str, Any],
+        retries: int = 3,
+        base_delay: float = 1.0
+    ) -> Dict[str, Any]:
+        """
+        Execute a tool with exponential backoff retry.
+
+        Args:
+            server_name: Name of server
+            tool_name: Name of tool to execute
+            kwargs: Tool parameters
+            retries: Number of retry attempts
+            base_delay: Base delay for exponential backoff (seconds)
+
+        Returns:
+            Tool execution result
+
+        Raises:
+            MCPClientError: If all retries fail
+        """
+        last_error = None
+
+        for attempt in range(retries):
+            try:
+                return await self.execute_tool(server_name, tool_name, **kwargs)
+            except MCPClientError as e:
+                last_error = e
+                if attempt < retries - 1:
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(
+                        f"Tool execution attempt {attempt + 1} failed, "
+                        f"retrying in {delay}s: {e}"
+                    )
+                    await asyncio.sleep(delay)
+
+        raise MCPClientError(
+            f"Tool execution failed after {retries} attempts: {last_error}"
+        )
+
+    async def get_wrapped_tools(self, server_name: str) -> List[Any]:
+        """
+        Get tools from a server wrapped as OrbitTool instances.
+
+        Args:
+            server_name: Name of the server
+
+        Returns:
+            List of MCPToolWrapper instances
+        """
+        from src.tools.mcp_wrapper import wrap_mcp_tools
+
+        tools_data = self.get_available_tools(server_name)
+        return wrap_mcp_tools(server_name, tools_data, self)
+
     async def disconnect_server(self, server_name: str) -> bool:
         """
         Disconnect from an MCP server.
@@ -419,6 +558,93 @@ class MCPClientManager:
                 if v.get("server") == server_name
             ]
         return [v["tool"] for v in self._tools.values()]
+
+    def register_tool(
+        self,
+        server_name: str,
+        tool_name: str,
+        description: str,
+        input_schema: Dict[str, Any]
+    ) -> None:
+        """
+        Manually register a tool for an MCP server.
+
+        Args:
+            server_name: Name of the server
+            tool_name: Name of the tool
+            description: Tool description
+            input_schema: JSON Schema for tool inputs
+        """
+        tool_key = f"{server_name}.{tool_name}"
+        self._tools[tool_key] = {
+            "server": server_name,
+            "tool": {
+                "name": tool_name,
+                "description": description,
+                "inputSchema": input_schema,
+            },
+        }
+        logger.info(f"Registered tool '{tool_name}' for server '{server_name}'")
+
+    def register_tools_from_integration_config(self, server_name: str) -> int:
+        """
+        Register tools from the integration config YAML.
+
+        Args:
+            server_name: Name of the server (e.g., "tavily", "google_workspace")
+
+        Returns:
+            Number of tools registered
+        """
+        from src.integrations.config import load_integration_configs
+
+        configs = load_integration_configs()
+        registered = 0
+
+        for integration_name, config in configs.items():
+            if config.mcp_server == server_name:
+                for tool_name in config.tool_names:
+                    # Create a basic schema for the tool
+                    schema = {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "description": f"Input for {tool_name}"},
+                        },
+                        "required": ["query"],
+                    }
+                    self.register_tool(
+                        server_name,
+                        tool_name,
+                        f"{config.display_name} tool: {tool_name}",
+                        schema
+                    )
+                    registered += 1
+
+        logger.info(f"Registered {registered} tools from integration config for '{server_name}'")
+        return registered
+
+    def get_all_tool_names(self) -> List[str]:
+        """
+        Get all registered tool names across all servers.
+
+        Returns:
+            List of tool names (format: "server.tool_name")
+        """
+        return list(self._tools.keys())
+
+    def get_tool_info(self, server_name: str, tool_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Get detailed information about a specific tool.
+
+        Args:
+            server_name: Name of the server
+            tool_name: Name of the tool
+
+        Returns:
+            Tool info dict or None if not found
+        """
+        tool_key = f"{server_name}.{tool_name}"
+        return self._tools.get(tool_key)
 
     def is_server_connected(self, server_name: str) -> bool:
         """Check if a server is connected."""

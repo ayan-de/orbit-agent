@@ -55,6 +55,10 @@ from src.agent.nodes.human_input import (
     route_after_confirmation,
 )
 from src.agent.nodes.web_search import web_search_node
+from src.agent.nodes.smart_router import (
+    smart_router_node,
+    route_after_smart_router,
+)
 from src.agent.state import AgentState
 from src.agent.edges import (
     route_after_classifier,
@@ -152,6 +156,7 @@ workflow = StateGraph(AgentState)
 
 # Add all nodes
 workflow.add_node("memory_loader", memory_loader_node)
+workflow.add_node("smart_router", smart_router_node)  # NEW: Smart router for tool loading
 workflow.add_node("classifier", classify_intent)
 workflow.add_node("session_writer", session_writer_node)
 workflow.add_node("command_generator", generate_command)
@@ -163,9 +168,19 @@ workflow.add_node("human_input", human_input_node)
 workflow.add_node("web_search", web_search_node)
 
 # Define edges
-# START → memory_loader → classifier
+# START → memory_loader → smart_router → [classifier | END]
 workflow.add_edge(START, "memory_loader")
-workflow.add_edge("memory_loader", "classifier")
+workflow.add_edge("memory_loader", "smart_router")
+
+# smart_router → [classifier | END (if auth required)]
+workflow.add_conditional_edges(
+    "smart_router",
+    route_after_smart_router,
+    {
+        "classifier": "classifier",
+        "end": END  # End if auth required
+    }
+)
 
 # classifier → [command_generator | planner | web_search | responder]
 # Based on intent: "command", "workflow", "web_search", "question", "confirmation", "unknown"

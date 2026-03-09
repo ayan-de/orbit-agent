@@ -57,3 +57,16 @@ class AgentState(TypedDict):
     # Environment and permissions
     environment: Literal["dev", "staging", "production"]
     user_permission_level: int
+
+    # Integration tracking (populated by smart_router node)
+    loaded_integrations: List[str]  # Names of active integrations
+    auth_required_integrations: Optional[List[Dict[str, Any]]]  # Integrations needing auth
+    total_tool_count: int  # Number of tools loaded
+    executor_tools: List[Any]  # Dynamically bound tools for executor
+    planner_hints: str  # Hints for planner from integrations
+    executor_hints: str  # Hints for executor from integrations
+    classification_method: str  # "regex" | "llm" | "fallback"
+    classification_confidence: float  # 0.0 - 1.0
+
+    # User tokens for authenticated integrations
+    user_tokens: Dict[str, str]  # integration_name -> auth_token

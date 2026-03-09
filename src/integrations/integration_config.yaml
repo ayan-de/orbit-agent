@@ -1,0 +1,290 @@
+# MCP Integration Configuration
+# Defines tool groups and their classification patterns
+
+integrations:
+  # Web Search (Tavily)
+  web_search:
+    tool_names:
+      - tavily_search
+      - tavily_extract
+      - tavily_crawl
+      - web_search
+      - news_search
+    display_name: "Web Search"
+    icon: "search"
+    requires_auth: false
+    mcp_server: "tavily"
+    request_patterns:
+      - '\b(search|find|research|lookup|google)\b'
+      - '\b(latest|recent|current)\s+(news|information|updates)\b'
+      - '\bwhat\s+(is|are)\s+(the\s+)?(latest|current|recent)\b'
+    keywords:
+      - search
+      - find
+      - research
+      - latest
+      - news
+      - discover
+      - lookup
+      - google
+      - web
+      - internet
+    planner_hints: ""
+    executor_hints: "Format search results with sources and summaries"
+
+  # Gmail
+  gmail:
+    tool_names:
+      - send_gmail_message
+      - search_gmail_messages
+      - draft_gmail_message
+      - list_gmail_labels
+      - get_gmail_message
+    display_name: "Gmail"
+    icon: "gmail"
+    requires_auth: true
+    mcp_server: "google_workspace"
+    request_patterns:
+      - '\b(email|mail|gmail)\b'
+      - '\b(send|write|compose)\s+(an?\s+)?(email|mail)\b'
+      - '\b(draft|inbox)\b'
+    keywords:
+      - email
+      - send
+      - mail
+      - gmail
+      - inbox
+      - draft
+      - message
+    planner_hints: "Use artifact title as email subject if available"
+    executor_hints: "Never ask for user email - it's implicit. Always confirm before sending."
+
+  # Google Docs
+  google_docs:
+    tool_names:
+      - create_doc
+      - get_doc_content
+      - modify_doc_text
+      - append_doc_text
+      - delete_doc
+    display_name: "Google Docs"
+    icon: "docs"
+    requires_auth: true
+    mcp_server: "google_workspace"
+    request_patterns:
+      - '\b(doc|document|google\s*doc)\b'
+      - '\b(create|write|make)\s+(a\s+)?(doc|document)\b'
+    keywords:
+      - doc
+      - document
+      - write
+      - memo
+      - report
+      - gdoc
+    planner_hints: ""
+    executor_hints: "Always report document URL after creation"
+
+  # Google Sheets
+  google_sheets:
+    tool_names:
+      - create_spreadsheet
+      - read_sheet_values
+      - modify_sheet_values
+      - append_sheet_values
+      - clear_sheet_values
+      - format_sheet_cells
+    display_name: "Google Sheets"
+    icon: "sheets"
+    requires_auth: true
+    mcp_server: "google_workspace"
+    request_patterns:
+      - '\b(sheet|spreadsheet|google\s*sheets?)\b'
+      - '\b(excel|spreadsheet)\b'
+    keywords:
+      - sheet
+      - spreadsheet
+      - data
+      - table
+      - excel
+      - row
+      - column
+      - cell
+    planner_hints: "Combine create/write/format into single step"
+    executor_hints: "Always format header row with bold + green background"
+
+  # Google Calendar
+  google_calendar:
+    tool_names:
+      - create_event
+      - get_events
+      - list_calendars
+      - update_event
+      - delete_event
+    display_name: "Google Calendar"
+    icon: "calendar"
+    requires_auth: true
+    mcp_server: "google_workspace"
+    request_patterns:
+      - '\b(calendar|schedule|meeting|event|appointment)\b'
+      - '\b(book|schedule)\s+(a\s+)?(meeting|event|call)\b'
+    keywords:
+      - calendar
+      - schedule
+      - meeting
+      - event
+      - appointment
+      - call
+      - booking
+    planner_hints: ""
+    executor_hints: "Use defaults for missing event fields. Always include timezone."
+
+  # Google Drive
+  google_drive:
+    tool_names:
+      - search_drive_files
+      - create_drive_file
+      - share_drive_file
+      - list_drive_files
+      - download_drive_file
+    display_name: "Google Drive"
+    icon: "drive"
+    requires_auth: true
+    mcp_server: "google_workspace"
+    request_patterns:
+      - '\b(drive|google\s*drive)\b'
+      - '\b(upload|share)\s+(file|folder)\b'
+    keywords:
+      - drive
+      - file
+      - upload
+      - download
+      - share
+      - folder
+      - gdrive
+    planner_hints: ""
+    executor_hints: "Always report file URL after creation"
+
+  # Notion
+  notion:
+    tool_names:
+      - API-post-search
+      - API-post-page
+      - API-patch-page
+      - API-get-page
+      - API-post-database-query
+    display_name: "Notion"
+    icon: "notion"
+    requires_auth: true
+    mcp_server: "notion"
+    request_patterns:
+      - '\b(notion|notion\s*page|notion\s*database)\b'
+    keywords:
+      - notion
+      - page
+      - note
+      - database
+      - workspace
+      - wiki
+    planner_hints: ""
+    executor_hints: "Use workspace parent if no parent page specified"
+
+  # GitHub
+  github:
+    tool_names:
+      - search_repositories
+      - get_repository
+      - create_issue
+      - create_pull_request
+      - list_issues
+      - get_file_contents
+    display_name: "GitHub"
+    icon: "github"
+    requires_auth: true
+    mcp_server: "github"
+    request_patterns:
+      - '\b(github|repo|repository)\b'
+      - '\b(pull\s*request|pr)\b'
+      - '\b(create|open)\s+(an?\s+)?(issue|pr)\b'
+    keywords:
+      - github
+      - repo
+      - commit
+      - branch
+      - pr
+      - issue
+      - pull
+      - merge
+    planner_hints: ""
+    executor_hints: ""
+
+  # Slack
+  slack:
+    tool_names:
+      - send_message
+      - list_channels
+      - get_channel_history
+      - create_channel
+      - join_channel
+    display_name: "Slack"
+    icon: "slack"
+    requires_auth: true
+    mcp_server: "slack"
+    request_patterns:
+      - '\b(slack|slack\s*channel|slack\s*message)\b'
+    keywords:
+      - slack
+      - channel
+      - message
+      - team
+      - dm
+    planner_hints: ""
+    executor_hints: "Check channel exists before sending. Use #general for announcements."
+
+  # File Operations (native, no MCP)
+  file_ops:
+    tool_names:
+      - list_files
+      - read_file
+      - write_file
+      - create_directory
+      - delete_path
+    display_name: "File Operations"
+    icon: "folder"
+    requires_auth: false
+    mcp_server: null
+    request_patterns:
+      - '\b(file|folder|directory|path)\b'
+      - '\b(list|read|write|create|delete)\s+(file|folder|dir)\b'
+    keywords:
+      - file
+      - folder
+      - directory
+      - path
+      - create
+      - delete
+      - read
+      - write
+    planner_hints: ""
+    executor_hints: "Always use absolute paths when possible"
+
+  # Shell Commands (native, no MCP)
+  shell:
+    tool_names:
+      - shell_exec
+    display_name: "Shell"
+    icon: "terminal"
+    requires_auth: false
+    mcp_server: null
+    request_patterns:
+      - '\b(run|execute|launch)\s+(command|script)\b'
+      - '\b(terminal|bash|shell)\b'
+    keywords:
+      - run
+      - execute
+      - command
+      - shell
+      - bash
+      - terminal
+      - script
+    planner_hints: "Use shell_exec for system commands not covered by other tools"
+    executor_hints: "Always validate dangerous commands before execution"
