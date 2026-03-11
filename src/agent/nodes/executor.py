@@ -238,15 +238,48 @@ class ExecutorNode:
 
         Returns:
             Tool execution result
+
+        Raises:
+            Exception: With helpful error context for MCP failures
         """
+        tool_name = tool.name
+
         if isinstance(tool, BaseTool) and not isinstance(tool, OrbitTool):
-            # MCP tool - use ainvoke
-            logger.debug(f"Executing MCP tool via ainvoke: {tool.name}")
-            return await tool.ainvoke(arguments)
+            # MCP tool - use ainvoke with error handling
+            logger.debug(f"Executing MCP tool via ainvoke: {tool_name}")
+            try:
+                result = await tool.ainvoke(arguments)
+                return result
+            except Exception as e:
+                error_msg = str(e)
+                logger.error(f"MCP tool '{tool_name}' failed: {error_msg}")
+
+                # Add context for common MCP errors
+                if "auth" in error_msg.lower() or "unauthorized" in error_msg.lower():
+                    raise Exception(
+                        f"Authentication required for '{tool_name}'. "
+                        f"The integration needs to be connected. "
+                        f"Original error: {error_msg}"
+                    )
+                elif "timeout" in error_msg.lower():
+                    raise Exception(
+                        f"Tool '{tool_name}' timed out. "
+                        f"The MCP server may be slow or unresponsive. "
+                        f"Original error: {error_msg}"
+                    )
+                elif "connection" in error_msg.lower() or "connect" in error_msg.lower():
+                    raise Exception(
+                        f"Could not connect to MCP server for '{tool_name}'. "
+                        f"Please ensure the integration is properly configured. "
+                        f"Original error: {error_msg}"
+                    )
+                else:
+                    # Re-raise with context
+                    raise Exception(f"MCP tool '{tool_name}' failed: {error_msg}")
         else:
             # Built-in OrbitTool - use execute
-            logger.debug(f"Executing built-in tool via execute: {tool.name}")
-            tool_input = await self._prepare_tool_input(tool, tool.name, arguments)
+            logger.debug(f"Executing built-in tool via execute: {tool_name}")
+            tool_input = await self._prepare_tool_input(tool, tool_name, arguments)
             return await tool.execute(tool_input)
 
     async def _prepare_tool_input(

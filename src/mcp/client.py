@@ -224,7 +224,10 @@ class MCPClientManager:
             MCPClientError: If execution fails
         """
         if not self._initialized or not self._client:
-            raise MCPClientError("MCP client not initialized")
+            raise MCPClientError(
+                "MCP client not initialized. "
+                "Ensure MCP servers are enabled and configured."
+            )
 
         # Find the tool by name
         for tool in self._tools:
@@ -234,10 +237,41 @@ class MCPClientManager:
                     result = await tool.ainvoke(kwargs)
                     return result
                 except Exception as e:
-                    logger.error(f"Tool execution failed: {e}")
-                    raise MCPClientError(f"Tool execution failed: {e}")
+                    error_msg = str(e)
+                    logger.error(f"MCP tool '{tool_name}' failed: {error_msg}")
 
-        raise MCPClientError(f"Tool '{tool_name}' not found")
+                    # Provide helpful error context
+                    if "auth" in error_msg.lower() or "unauthorized" in error_msg.lower():
+                        raise MCPClientError(
+                            f"Authentication required for '{tool_name}'. "
+                            f"Please connect the {server_name} integration."
+                        )
+                    elif "not found" in error_msg.lower():
+                        raise MCPClientError(
+                            f"Resource not found in {server_name}: {error_msg}"
+                        )
+                    elif "timeout" in error_msg.lower():
+                        raise MCPClientError(
+                            f"Tool '{tool_name}' timed out. "
+                            f"The {server_name} server may be slow or unresponsive."
+                        )
+                    else:
+                        raise MCPClientError(
+                            f"Tool '{tool_name}' execution failed: {error_msg}"
+                        )
+
+        # Tool not found - provide suggestions
+        available_tools = [t.name for t in self._tools]
+        suggestions = [t for t in available_tools if tool_name.lower() in t.lower()][:3]
+
+        suggestion_text = ""
+        if suggestions:
+            suggestion_text = f" Did you mean: {', '.join(suggestions)}?"
+
+        raise MCPClientError(
+            f"Tool '{tool_name}' not found.{suggestion_text} "
+            f"Available MCP tools: {available_tools[:10]}{'...' if len(available_tools) > 10 else ''}"
+        )
 
     def get_tools(self) -> list[BaseTool]:
         """Get all loaded LangChain tools."""
