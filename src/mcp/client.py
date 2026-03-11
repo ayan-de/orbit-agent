@@ -268,7 +268,7 @@ class MCPClientManager:
             {
                 "name": t.name,
                 "description": t.description,
-                "inputSchema": _sanitize_tool_schema(t.args_schema.model_json_schema() if t.args_schema else {}),
+                "inputSchema": sanitize_tool_schema(t.args_schema.model_json_schema() if t.args_schema else {}),
             }
             for t in self._tools
         ]
@@ -438,6 +438,94 @@ class MCPClientManager:
 
         tools_data = self.get_available_tools(server_name)
         return wrap_mcp_tools(server_name, tools_data, self)
+
+    # =========================================================================
+    # Phase 1: IntegrationRegistry Connection
+    # =========================================================================
+
+    # Mapping of MCP server names to integration names
+    SERVER_TO_INTEGRATION: dict[str, str] = {
+        "google_workspace": "gmail",
+        "tavily": "web_search",
+    }
+
+    # Mapping of tool name prefixes to integration names
+    TOOL_PREFIX_TO_INTEGRATION: dict[str, str] = {
+        # Google Workspace tools
+        "gmail": "gmail",
+        "drive": "gmail",
+        "calendar": "gmail",
+        "docs": "gmail",
+        "sheets": "gmail",
+        "slides": "gmail",
+        "search_gmail": "gmail",
+        "send_gmail": "gmail",
+        "list_gmail": "gmail",
+        "get_gmail": "gmail",
+        "draft_gmail": "gmail",
+        # Tavily tools
+        "tavily": "web_search",
+        "search": "web_search",
+        "crawl": "web_search",
+        "extract": "web_search",
+    }
+
+    def get_integration_for_tool(self, tool_name: str) -> str:
+        """
+        Determine which integration a tool belongs to.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            Integration name (defaults to 'unknown')
+        """
+        tool_lower = tool_name.lower()
+
+        # Check prefixes
+        for prefix, integration in self.TOOL_PREFIX_TO_INTEGRATION.items():
+            if tool_lower.startswith(prefix):
+                return integration
+
+        return "unknown"
+
+    def register_tools_with_integration_registry(self, registry: Any) -> int:
+        """
+        Register all loaded MCP tools with the IntegrationRegistry.
+
+        This is the key connection point between MCP tools and the
+        integration system used by smart_router and executor.
+
+        Args:
+            registry: IntegrationRegistry instance
+
+        Returns:
+            Number of tools registered
+        """
+        if not self._initialized:
+            logger.warning("Cannot register tools: MCP client not initialized")
+            return 0
+
+        registered_count = 0
+
+        for tool in self._tools:
+            # Determine which integration this tool belongs to
+            integration_name = self.get_integration_for_tool(tool.name)
+
+            if integration_name == "unknown":
+                # Try server mapping as fallback
+                server_name = self._get_server_for_tool(tool.name)
+                integration_name = self.SERVER_TO_INTEGRATION.get(server_name, "unknown")
+
+            if integration_name != "unknown":
+                registry.register_tool(integration_name, tool)
+                registered_count += 1
+                logger.debug(f"Registered MCP tool '{tool.name}' → integration '{integration_name}'")
+            else:
+                logger.warning(f"Could not map MCP tool '{tool.name}' to any integration")
+
+        logger.info(f"Registered {registered_count}/{len(self._tools)} MCP tools with IntegrationRegistry")
+        return registered_count
 
 
 # Global MCP client manager instance

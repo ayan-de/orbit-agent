@@ -7,16 +7,22 @@ from src.api.router import api_router
 from src.config import settings
 from src.mcp.client import get_mcp_client, MCPClientManager
 
+# Global state for health check
+mcp_servers_initialized = False
+mcp_tools_registered = 0
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown logic"""
+    global mcp_servers_initialized, mcp_tools_registered
+
     print("🚀 Orbit Agent starting up...")
     print(f"📍 Port: {settings.PORT}")
     print(f"🤖 Default LLM: {settings.DEFAULT_LLM_PROVIDER}")
 
     # Initialize MCP servers
     mcp_client = get_mcp_client()
-    mcp_servers_initialized = False
 
     if settings.MCP_SERVERS_ENABLED:
         print("🔌 Initializing MCP servers...")
@@ -24,6 +30,17 @@ async def lifespan(app: FastAPI):
             mcp_servers_initialized = await mcp_client.initialize_servers()
             if mcp_servers_initialized:
                 print("✅ MCP servers initialized successfully")
+
+                # Phase 1: Register MCP tools with IntegrationRegistry
+                print("📦 Registering MCP tools with IntegrationRegistry...")
+                try:
+                    from src.integrations.registry import get_registry
+                    registry = await get_registry()
+                    mcp_tools_registered = mcp_client.register_tools_with_integration_registry(registry)
+                    print(f"✅ Registered {mcp_tools_registered} MCP tools")
+                except Exception as e:
+                    print(f"⚠️  Failed to register MCP tools: {e}")
+
             else:
                 print("⚠️  No MCP servers configured")
         except Exception as e:
@@ -78,7 +95,8 @@ async def health_check():
         "status": "healthy",
         "version": "0.1.0",
         "llm_provider": settings.DEFAULT_LLM_PROVIDER,
-        "mcp_servers": "initialized" if mcp_servers_initialized else "not_configured"
+        "mcp_servers": "initialized" if mcp_servers_initialized else "not_configured",
+        "mcp_tools": mcp_tools_registered,
     }
 
 
