@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     # Frontend Settings
     FRONTEND_URL: str = "http://localhost:3000"
 
+    # Google MCP Credentials Directory
+    GOOGLE_MCP_CREDENTIALS_DIR: str = "/tmp/.google_workspace_mcp/credentials"
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()

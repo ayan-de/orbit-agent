@@ -5,12 +5,10 @@ This module provides client functionality for connecting to and interacting with
 MCP servers provide standardized tool interfaces for external services.
 """
 
-from .client import MCPClientManager, get_mcp_client
-from .config import MCPServerConfig, get_mcp_server_config
+from .client import MCPClientManager, get_mcp_client, MCPClientError
 
 __all__ = [
     "MCPClientManager",
     "get_mcp_client",
-    "MCPServerConfig",
-    "get_mcp_server_config",
+    "MCPClientError",
 ]
