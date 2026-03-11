@@ -5,6 +5,8 @@ class AgentRequest(BaseModel):
     message: str
     session_id: str = "default"
     user_id: str = "user"
+    # User tokens for authenticated integrations (integration_name -> token)
+    user_tokens: Dict[str, str] = {}
 
 class AgentResponse(BaseModel):
     messages: List[str]

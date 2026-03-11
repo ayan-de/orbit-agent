@@ -77,6 +77,8 @@ async def invoke_agent(request: AgentRequest):
             "session_id": request.session_id,
             "user_id": request.user_id,
             "iteration_count": 0,
+            # Phase 4: User tokens for authenticated integrations
+            "user_tokens": request.user_tokens or {},
             # Email fields
             "email_draft_id": None,
             "email_to": None,
@@ -158,6 +160,7 @@ async def stream_agent(websocket: WebSocket):
         session_id = data.get("session_id", "default")
         user_id = data.get("user_id", "user")
         message = data.get("message", "")
+        user_tokens = data.get("user_tokens", {})  # Phase 4: Accept tokens
 
         if not message:
             await websocket.send_json({
@@ -182,6 +185,8 @@ async def stream_agent(websocket: WebSocket):
             "session_id": session_id,
             "user_id": user_id,
             "iteration_count": 0,
+            # Phase 4: User tokens for authenticated integrations
+            "user_tokens": user_tokens,
             # Email fields
             "email_draft_id": None,
             "email_to": None,
