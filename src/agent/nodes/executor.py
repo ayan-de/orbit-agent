@@ -2,14 +2,16 @@
 Executor node for LangGraph workflow.
 
 Executes tool calls from planner and handles results.
+Supports both built-in OrbitTools and MCP tools (BaseTool).
 """
 
 import logging
 import time
-from typing import Dict, Any, Optional, List, TYPE_CHECKING
+from typing import Dict, Any, Optional, List, TYPE_CHECKING, Union
 from enum import Enum
 
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
+from langchain_core.tools import BaseTool
 
 from src.agent.state import AgentState
 from src.tools import get_tool_registry
@@ -19,6 +21,7 @@ from src.llm.factory import llm_factory
 
 if TYPE_CHECKING:
     from src.tools.registry import ToolRegistry
+    from src.integrations.registry import IntegrationRegistry
 
 logger = logging.getLogger("orbit.executor")
 
@@ -109,9 +112,11 @@ class ExecutorNode:
                 "tool_name": None,
             }
 
-        tool = registry.get_tool(tool_name)
+        # Phase 2: Check both built-in registry AND MCP tools from state
+        tool = self._get_tool(tool_name, registry, state)
+
         if tool is None:
-            available = registry.get_tool_names()
+            available = self._get_all_available_tools(registry, state)
             logger.error(f"Tool '{tool_name}' not found. Available: {available}")
             return {
                 "step_number": step_number,
@@ -128,12 +133,11 @@ class ExecutorNode:
         execution_time_ms = None
 
         try:
-            tool_input = await self._prepare_tool_input(tool, tool_name, arguments)
-
             start_time = self._get_current_time_ms()
-            logger.info(f"Executing tool: {tool_name} with input: {tool_input}")
+            logger.info(f"Executing tool: {tool_name} with input: {arguments}")
 
-            result = await tool.execute(tool_input)
+            # Phase 2: Handle both OrbitTool and BaseTool (MCP)
+            result = await self._execute_tool(tool, arguments)
 
             execution_time_ms = self._get_current_time_ms() - start_time
             logger.info(f"Tool execution time: {execution_time_ms}ms")
@@ -169,6 +173,82 @@ class ExecutorNode:
             "tool_name": tool_name,
         }
 
+    def _get_tool(
+        self,
+        tool_name: str,
+        registry: "ToolRegistry",
+        state: AgentState,
+    ) -> Optional[Union[OrbitTool, BaseTool]]:
+        """
+        Get a tool by name from either built-in registry or MCP tools.
+
+        Phase 2: Unified tool access.
+
+        Args:
+            tool_name: Name of the tool
+            registry: Built-in tool registry
+            state: Agent state (contains executor_tools from smart_router)
+
+        Returns:
+            OrbitTool (built-in) or BaseTool (MCP) or None
+        """
+        # First check built-in registry
+        tool = registry.get_tool(tool_name)
+        if tool:
+            logger.debug(f"Found '{tool_name}' in built-in registry")
+            return tool
+
+        # Then check MCP tools from state (loaded by smart_router)
+        executor_tools = state.get("executor_tools", [])
+        for mcp_tool in executor_tools:
+            if isinstance(mcp_tool, BaseTool) and mcp_tool.name == tool_name:
+                logger.debug(f"Found '{tool_name}' in MCP tools")
+                return mcp_tool
+
+        logger.debug(f"Tool '{tool_name}' not found in any registry")
+        return None
+
+    def _get_all_available_tools(
+        self,
+        registry: "ToolRegistry",
+        state: AgentState,
+    ) -> List[str]:
+        """Get list of all available tool names from both registries."""
+        tools = registry.get_tool_names()
+
+        # Add MCP tool names from state
+        executor_tools = state.get("executor_tools", [])
+        for mcp_tool in executor_tools:
+            if isinstance(mcp_tool, BaseTool):
+                tools.append(mcp_tool.name)
+
+        return tools
+
+    async def _execute_tool(
+        self,
+        tool: Union[OrbitTool, BaseTool],
+        arguments: Dict[str, Any],
+    ) -> Any:
+        """
+        Execute a tool, handling both OrbitTool and BaseTool (MCP).
+
+        Args:
+            tool: OrbitTool (built-in) or BaseTool (MCP)
+            arguments: Tool arguments
+
+        Returns:
+            Tool execution result
+        """
+        if isinstance(tool, BaseTool) and not isinstance(tool, OrbitTool):
+            # MCP tool - use ainvoke
+            logger.debug(f"Executing MCP tool via ainvoke: {tool.name}")
+            return await tool.ainvoke(arguments)
+        else:
+            # Built-in OrbitTool - use execute
+            logger.debug(f"Executing built-in tool via execute: {tool.name}")
+            tool_input = await self._prepare_tool_input(tool, tool.name, arguments)
+            return await tool.execute(tool_input)
+
     async def _prepare_tool_input(
         self, tool: OrbitTool, tool_name: str, arguments: Optional[Dict[str, Any]]
     ) -> Dict[str, Any]:
@@ -184,8 +264,6 @@ class ExecutorNode:
                 return validated.model_dump()
             except ValidationError:
                 return arguments
-
-        return arguments
 
         return arguments
 
