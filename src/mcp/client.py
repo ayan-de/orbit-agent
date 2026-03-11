@@ -443,29 +443,56 @@ class MCPClientManager:
     # Phase 1: IntegrationRegistry Connection
     # =========================================================================
 
-    # Mapping of MCP server names to integration names
+    # Mapping of MCP server names to integration names (fallback)
     SERVER_TO_INTEGRATION: dict[str, str] = {
-        "google_workspace": "gmail",
+        "google_workspace": "gmail",  # Default fallback
         "tavily": "web_search",
     }
 
     # Mapping of tool name prefixes to integration names
+    # Must match integration names in integration_config.yaml
     TOOL_PREFIX_TO_INTEGRATION: dict[str, str] = {
-        # Google Workspace tools
+        # Gmail tools
         "gmail": "gmail",
-        "drive": "gmail",
-        "calendar": "gmail",
-        "docs": "gmail",
-        "sheets": "gmail",
-        "slides": "gmail",
         "search_gmail": "gmail",
         "send_gmail": "gmail",
         "list_gmail": "gmail",
         "get_gmail": "gmail",
         "draft_gmail": "gmail",
+        "batch_modify_gmail": "gmail",
+        # Google Drive tools
+        "drive": "google_drive",
+        "search_drive": "google_drive",
+        "list_drive": "google_drive",
+        "get_drive": "google_drive",
+        "create_drive": "google_drive",
+        "share_drive": "google_drive",
+        "download_drive": "google_drive",
+        # Google Docs tools
+        "docs": "google_docs",
+        "create_doc": "google_docs",
+        "get_doc": "google_docs",
+        "modify_doc": "google_docs",
+        "append_doc": "google_docs",
+        "delete_doc": "google_docs",
+        # Google Sheets tools
+        "sheet": "google_sheets",
+        "spreadsheet": "google_sheets",
+        "create_spreadsheet": "google_sheets",
+        "read_sheet": "google_sheets",
+        "modify_sheet": "google_sheets",
+        "append_sheet": "google_sheets",
+        "clear_sheet": "google_sheets",
+        # Google Calendar tools
+        "calendar": "google_calendar",
+        "event": "google_calendar",
+        "list_calendar": "google_calendar",
+        "get_event": "google_calendar",
+        "create_event": "google_calendar",
+        "update_event": "google_calendar",
+        "delete_event": "google_calendar",
         # Tavily tools
         "tavily": "web_search",
-        "search": "web_search",
         "crawl": "web_search",
         "extract": "web_search",
     }
