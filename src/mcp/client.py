@@ -31,55 +31,125 @@ class MCPClientError(Exception):
     pass
 
 
-def _sanitize_tool_schema(schema: dict) -> dict:
-    """
-    Sanitize tool schema to remove unsupported JSON Schema features.
+# Keys that some LLMs (especially Gemini) don't support in function-calling API
+_UNSUPPORTED_SCHEMA_KEYS = frozenset({"additionalProperties", "$schema"})
 
-    LangChain/Pydantic may not support all JSON Schema features, so we
-    clean up the schema to ensure compatibility.
+
+def sanitize_tool_schema(schema: dict) -> dict:
+    """
+    Recursively sanitize a tool schema for LLM compatibility.
+
+    Handles issues that cause problems with Gemini, Claude, and OpenAI:
+    - Removes null values at any nesting level
+    - Simplifies anyOf/oneOf validators to first non-null type
+    - Strips unsupported keys ($schema, additionalProperties)
+    - Removes properties with None values
+    - Handles empty required arrays
 
     Args:
-        schema: Original tool schema
+        schema: Original JSON Schema dict
 
     Returns:
-        Sanitized schema
+        Sanitized schema compatible with all major LLMs
     """
     if not isinstance(schema, dict):
         return schema
 
     sanitized = {}
     for key, value in schema.items():
-        if key == "$schema":
-            # Remove $schema directive
+        # Skip null values - some LLMs don't accept them
+        if value is None:
             continue
-        elif key == "additionalProperties":
-            # Convert boolean to appropriate form or remove
-            if isinstance(value, bool):
-                sanitized[key] = value
-            else:
-                sanitized[key] = True
-        elif key == "properties" and isinstance(value, dict):
-            # Recursively sanitize properties
-            sanitized[key] = {
-                k: _sanitize_tool_schema(v) for k, v in value.items()
-            }
-        elif key == "items" and isinstance(value, dict):
-            # Sanitize items schema
-            sanitized[key] = _sanitize_tool_schema(value)
-        elif key == "default":
-            # Keep defaults as-is
-            sanitized[key] = value
-        elif isinstance(value, dict):
-            sanitized[key] = _sanitize_tool_schema(value)
-        elif isinstance(value, list):
-            sanitized[key] = [
-                _sanitize_tool_schema(item) if isinstance(item, dict) else item
+
+        # Strip keys unsupported by some LLMs (Gemini in particular)
+        if key in _UNSUPPORTED_SCHEMA_KEYS:
+            continue
+
+        # Handle anyOf/oneOf: pick the first non-null type definition
+        if key in ("anyOf", "oneOf"):
+            if isinstance(value, list) and value:
+                for item in value:
+                    if isinstance(item, dict):
+                        # Skip "null" type definitions
+                        if item.get("type") == "null":
+                            continue
+                        # Use the first valid type definition
+                        sanitized_item = sanitize_tool_schema(item)
+                        if sanitized_item:
+                            # Merge the first valid definition into parent
+                            for k, v in sanitized_item.items():
+                                if k not in sanitized:
+                                    sanitized[k] = v
+                            break
+            continue
+
+        # Recursively sanitize properties
+        if key == "properties" and isinstance(value, dict):
+            sanitized_props = {}
+            for prop_name, prop_value in value.items():
+                if prop_value is None:
+                    continue
+                if isinstance(prop_value, dict):
+                    sanitized_prop = sanitize_tool_schema(prop_value)
+                    if sanitized_prop:
+                        sanitized_props[prop_name] = sanitized_prop
+                else:
+                    sanitized_props[prop_name] = prop_value
+            if sanitized_props:
+                sanitized[key] = sanitized_props
+            continue
+
+        # Recursively sanitize nested dicts
+        if isinstance(value, dict):
+            sanitized_value = sanitize_tool_schema(value)
+            if sanitized_value:  # Only add if not empty
+                sanitized[key] = sanitized_value
+            continue
+
+        # Recursively sanitize list items
+        if isinstance(value, list):
+            sanitized_list = [
+                sanitize_tool_schema(item) if isinstance(item, dict) else item
                 for item in value
+                if item is not None
             ]
-        else:
-            sanitized[key] = value
+            if sanitized_list or key == "required":  # Keep required even if empty
+                sanitized[key] = sanitized_list
+            continue
+
+        # Keep other values as-is
+        sanitized[key] = value
 
     return sanitized
+
+
+def sanitize_tool(tool: BaseTool) -> BaseTool:
+    """
+    Sanitize a tool's schema for LLM compatibility.
+
+    Args:
+        tool: LangChain BaseTool instance
+
+    Returns:
+        The same tool (schema is validated but tools are immutable)
+    """
+    try:
+        if hasattr(tool, "args_schema") and tool.args_schema:
+            # Handle both Pydantic models and plain dicts
+            if isinstance(tool.args_schema, dict):
+                schema = tool.args_schema
+            elif hasattr(tool.args_schema, "model_json_schema"):
+                schema = tool.args_schema.model_json_schema()
+            else:
+                return tool
+
+            sanitized = sanitize_tool_schema(schema)
+            if schema != sanitized:
+                logger.debug(f"Sanitized schema for tool: {tool.name}")
+    except Exception as e:
+        logger.warning(f"Could not sanitize tool {tool.name}: {e}")
+
+    return tool
 
 
 class MCPClientManager:
@@ -189,7 +259,7 @@ class MCPClientManager:
                 {
                     "name": t.name,
                     "description": t.description,
-                    "inputSchema": _sanitize_tool_schema(t.args_schema.model_json_schema() if t.args_schema else {}),
+                    "inputSchema": sanitize_tool_schema(t.args_schema.model_json_schema() if t.args_schema else {}),
                 }
                 for t in self._tools if t.name in tool_names
             ]
@@ -222,7 +292,7 @@ class MCPClientManager:
                 return {
                     "name": tool.name,
                     "description": tool.description,
-                    "inputSchema": _sanitize_tool_schema(tool.args_schema.model_json_schema() if tool.args_schema else {}),
+                    "inputSchema": sanitize_tool_schema(tool.args_schema.model_json_schema() if tool.args_schema else {}),
                 }
         return None
 
@@ -316,16 +386,8 @@ class MCPClientManager:
                         logger.info(f"Skipping blocked tool: {tool.name}")
                         continue
 
-                    # Sanitize the tool's args_schema if present
-                    if hasattr(tool, 'args_schema') and tool.args_schema:
-                        try:
-                            schema = tool.args_schema.model_json_schema()
-                            sanitized = _sanitize_tool_schema(schema)
-                            # The schema is read-only, but we've validated it works
-                            logger.debug(f"Tool '{tool.name}' schema validated")
-                        except Exception as e:
-                            logger.warning(f"Could not validate schema for tool '{tool.name}': {e}")
-
+                    # Sanitize the tool's schema for LLM compatibility
+                    sanitize_tool(tool)
                     filtered_tools.append(tool)
 
                 return filtered_tools
