@@ -5,6 +5,7 @@ Handles user confirmation flows for tool execution.
 Integrates with LangGraph to pause and wait for user input when needed.
 """
 
+import logging
 from typing import Dict, Any, Optional
 
 from src.agent.state import AgentState
@@ -15,6 +16,10 @@ from src.tools.permission import (
     parse_confirmation_response,
     PermissionCheckResult,
 )
+from src.bridge.orchestrator_client import orchestrator_client
+from src.bridge.schemas import ConfirmationType
+
+logger = logging.getLogger("orbit.human_input")
 
 
 # ============================================================================
@@ -26,6 +31,7 @@ async def human_input_node(
     tool_name: Optional[str] = None,
     tool_danger_level: Optional[int] = None,
     auto_approve: bool = False,
+    use_real_confirmation: bool = True,
 ) -> Dict[str, Any]:
     """
     Human input node for LangGraph - handles user confirmations.
@@ -33,33 +39,25 @@ async def human_input_node(
     This node:
     1. Checks if tool execution requires confirmation
     2. Generates user-friendly confirmation prompt
-    3. Waits for user response
-    4. Returns approval/denial result
-
-    In the actual implementation, this would:
-    - Send a message to the user via the Bridge
-    - Wait for user response
-    - Parse the response and update state
+    3. Sends confirmation request to user via Bridge
+    4. Waits for user response
+    5. Returns approval/denial result
 
     Args:
         state: Current agent state
         tool_name: Name of tool being executed (optional, taken from state if not provided)
         tool_danger_level: Danger level of tool (optional)
         auto_approve: If True, auto-approve safe tools without asking
+        use_real_confirmation: If True, use Bridge for real confirmation (default)
 
     Returns:
         State updates with:
         - user_confirmation: True/False/None based on user response
         - confirmation_prompt: The prompt shown to user
         - tool_executed: True if tool was executed
-
-    Note:
-        This is a simplified implementation. In production, this would integrate
-        with the Bridge to send messages and wait for user responses.
     """
     # Get tool details from state or parameters
     if tool_name is None:
-        # Try to get from state (would be set by previous node)
         tool_name = state.get("pending_tool_name")
 
     # If no tool to confirm, pass through
@@ -75,7 +73,6 @@ async def human_input_node(
         tool_danger_level = state.get("pending_tool_danger_level", 0)
 
     # Create a mock tool object for permission checking
-    # In production, this would retrieve the actual tool from the registry
     class MockTool:
         name: str = tool_name
         danger_level: int = tool_danger_level
@@ -100,26 +97,31 @@ async def human_input_node(
         tool,  # type: ignore
         user_permission_level=user_permission_level,
     ):
+        logger.info(f"Auto-approved tool: {tool_name}")
         return {
             "user_confirmation": True,
             "confirmation_prompt": None,
-            "tool_executed": False,  # Will be executed by next node
+            "tool_executed": False,
             "auto_approved": True,
         }
 
-    # If confirmation required, generate prompt
+    # If confirmation required, request from user
     if check_result.requires_confirmation():
         prompt = get_permission_prompt(tool, check_result)  # type: ignore
 
-        # In production, this would:
-        # 1. Send prompt to user via Bridge
-        # 2. Wait for user response
-        # 3. Parse response
+        # Use real Bridge confirmation if enabled
+        if use_real_confirmation:
+            return await _request_real_confirmation(
+                state=state,
+                tool_name=tool_name,
+                tool_danger_level=tool_danger_level,
+                prompt=prompt,
+                check_result=check_result,
+            )
 
-        # For now, simulate auto-deny for demo purposes
-        # Real implementation would wait for actual user input
+        # Fallback: simulated confirmation (for testing/demo)
         return {
-            "user_confirmation": None,  # Awaiting user input
+            "user_confirmation": None,
             "confirmation_prompt": prompt,
             "tool_executed": False,
             "auto_approved": False,
@@ -132,6 +134,88 @@ async def human_input_node(
         "tool_executed": False,
         "auto_approved": True,
     }
+
+
+async def _request_real_confirmation(
+    state: AgentState,
+    tool_name: str,
+    tool_danger_level: int,
+    prompt: str,
+    check_result: PermissionCheckResult,
+) -> Dict[str, Any]:
+    """
+    Request real confirmation from user via Bridge.
+
+    Args:
+        state: Current agent state
+        tool_name: Name of the tool
+        tool_danger_level: Danger level of the tool
+        prompt: Confirmation prompt text
+        check_result: Permission check result
+
+    Returns:
+        State updates with confirmation result
+    """
+    # Determine confirmation type based on tool
+    confirmation_type = ConfirmationType.TOOL_EXECUTION
+    if "shell" in tool_name.lower() or "command" in tool_name.lower():
+        confirmation_type = ConfirmationType.COMMAND_EXECUTION
+    elif "file" in tool_name.lower():
+        confirmation_type = ConfirmationType.FILE_MODIFICATION
+
+    # Build details for confirmation
+    plan = state.get("plan", {})
+    current_step = state.get("current_step", 0)
+    steps = plan.get("steps", [])
+    current_step_info = steps[current_step - 1] if 0 < current_step <= len(steps) else None
+
+    details = {
+        "tool_name": tool_name,
+        "danger_level": tool_danger_level,
+        "reason": check_result.reason,
+        "current_step": current_step,
+        "step_description": current_step_info.get("description") if current_step_info else None,
+        "plan_goal": plan.get("goal"),
+    }
+
+    # Add command details if available
+    if current_step_info and current_step_info.get("arguments"):
+        args = current_step_info.get("arguments", {})
+        if "command" in args:
+            details["command"] = args["command"]
+
+    try:
+        # Request confirmation via Bridge
+        response = await orchestrator_client.request_confirmation(
+            confirmation_type=confirmation_type,
+            title=f"Confirm: {tool_name}",
+            message=prompt,
+            details=details,
+            danger_level=tool_danger_level,
+            timeout_seconds=60,
+        )
+
+        logger.info(f"Confirmation response for {tool_name}: approved={response.approved}")
+
+        return {
+            "user_confirmation": response.approved,
+            "confirmation_prompt": prompt,
+            "tool_executed": False,
+            "auto_approved": False,
+            "user_response": response.response,
+            "remember_decision": response.remember_decision,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get confirmation: {e}")
+        # Default to deny on error
+        return {
+            "user_confirmation": False,
+            "confirmation_prompt": prompt,
+            "tool_executed": False,
+            "auto_approved": False,
+            "user_response": f"Error: {str(e)}",
+        }
 
 
 async def process_user_confirmation(

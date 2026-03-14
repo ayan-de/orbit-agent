@@ -2,10 +2,23 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
+import logging
 
 from src.api.router import api_router
 from src.config import settings
 from src.mcp.client import get_mcp_client, MCPClientManager
+from src.middleware import (
+    register_exception_handlers,
+    AuthMiddleware,
+    setup_rate_limiting,
+)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG if settings.DEBUG else logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 # Global state for health check
 mcp_servers_initialized = False
@@ -68,6 +81,16 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Register exception handlers
+register_exception_handlers(app)
+
+# Setup rate limiting
+setup_rate_limiting(app)
+
+# Add authentication middleware
+app.add_middleware(AuthMiddleware)
+
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

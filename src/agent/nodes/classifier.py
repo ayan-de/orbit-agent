@@ -40,12 +40,13 @@ async def classify_intent(state: AgentState) -> Dict[str, Any]:
     # Create the chain
     chain = classifier_prompt | llm | StrOutputParser()
 
-    # Execute the chain
-    # Note: memory_context is not fully implemented yet (Phase 2)
-    # Using placeholder for now
+    # Get memory context from state (populated by memory_loader_node)
+    memory_context = state.get("memory_context", "")
+
+    # Execute the chain with memory context
     intent_str = await chain.ainvoke({
         "input": user_input,
-        "memory_context": "No memory context available (Phase 1)"
+        "memory_context": memory_context if memory_context else "No previous context available."
     })
     
     # Normalize and validate the output

@@ -363,7 +363,7 @@ class MCPClientManager:
                 "cwd": "/tmp",
             }
 
-        # Tavily MCP
+        # Tavily MCP (Web Search)
         if settings.TAVILY_API_KEY:
             tavily_env = os.environ.copy()
             tavily_env["TAVILY_API_KEY"] = settings.TAVILY_API_KEY

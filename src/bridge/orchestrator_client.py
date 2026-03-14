@@ -1,9 +1,17 @@
 import httpx
 import logging
+import uuid
 from typing import Dict, Any, Optional, List
+import asyncio
 
 from src.config import settings
-from src.bridge.schemas import BridgeCommandRequest, BridgeCommandResponse
+from src.bridge.schemas import (
+    BridgeCommandRequest,
+    BridgeCommandResponse,
+    ConfirmationRequest,
+    ConfirmationResponse,
+    ConfirmationType,
+)
 
 logger = logging.getLogger("orbit.bridge")
 
@@ -151,6 +159,139 @@ class OrchestratorClient:
     async def get_file_info(self, path: str) -> BridgeCommandResponse:
         """Helper to get file information."""
         return await self.execute_command("stat", [path])
+
+    # =========================================================================
+    # Human-in-Loop Confirmation Methods
+    # =========================================================================
+
+    async def request_confirmation(
+        self,
+        confirmation_type: ConfirmationType,
+        title: str,
+        message: str,
+        details: Optional[Dict[str, Any]] = None,
+        danger_level: int = 0,
+        timeout_seconds: Optional[int] = 60,
+    ) -> ConfirmationResponse:
+        """
+        Request user confirmation via Bridge.
+
+        Sends a confirmation request to the Bridge, which forwards it to
+        the user's desktop client. Waits for the response.
+
+        Args:
+            confirmation_type: Type of confirmation needed
+            title: Short title for the confirmation
+            message: Detailed message explaining what needs confirmation
+            details: Additional context (command, tool name, etc.)
+            danger_level: Risk level (0=safe to 4=critical)
+            timeout_seconds: Auto-deny timeout
+
+        Returns:
+            ConfirmationResponse with user's decision
+        """
+        confirmation_id = str(uuid.uuid4())
+
+        request = ConfirmationRequest(
+            confirmation_id=confirmation_id,
+            confirmation_type=confirmation_type,
+            title=title,
+            message=message,
+            details=details or {},
+            danger_level=danger_level,
+            timeout_seconds=timeout_seconds,
+        )
+
+        try:
+            logger.info(f"Requesting confirmation: {confirmation_id} - {title}")
+
+            # Send confirmation request to Bridge
+            response = await self.client.post(
+                "/api/v1/confirmations/request",
+                json=request.model_dump(),
+            )
+            response.raise_for_status()
+
+            # Poll for response (Bridge will notify when user responds)
+            # In production, this would use WebSockets for real-time updates
+            max_polls = (timeout_seconds or 60) // 2
+            for _ in range(max_polls):
+                poll_response = await self.client.get(
+                    f"/api/v1/confirmations/{confirmation_id}/response"
+                )
+
+                if poll_response.status_code == 200:
+                    data = poll_response.json()
+                    if data.get("status") == "responded":
+                        logger.info(f"Confirmation {confirmation_id}: {'approved' if data.get('approved') else 'denied'}")
+                        return ConfirmationResponse(**data)
+
+                # Wait before polling again
+                await asyncio.sleep(2)
+
+            # Timeout - auto-deny
+            logger.warning(f"Confirmation {confirmation_id} timed out")
+            return ConfirmationResponse(
+                confirmation_id=confirmation_id,
+                approved=False,
+                response="Confirmation timed out",
+            )
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Confirmation request failed: {e.response.status_code}")
+            # Default to deny on error
+            return ConfirmationResponse(
+                confirmation_id=confirmation_id,
+                approved=False,
+                response=f"Error: {e.response.text}",
+            )
+        except Exception as e:
+            logger.error(f"Confirmation request error: {e}")
+            return ConfirmationResponse(
+                confirmation_id=confirmation_id,
+                approved=False,
+                response=f"Error: {str(e)}",
+            )
+
+    async def send_confirmation_response(
+        self,
+        confirmation_id: str,
+        approved: bool,
+        response: Optional[str] = None,
+        remember_decision: bool = False,
+    ) -> bool:
+        """
+        Send a confirmation response (used by Bridge to respond).
+
+        This is typically called by the Bridge when user responds via desktop client.
+
+        Args:
+            confirmation_id: ID of the confirmation request
+            approved: Whether user approved
+            response: Optional user message
+            remember_decision: Whether to remember this decision
+
+        Returns:
+            True if response was recorded successfully
+        """
+        try:
+            response_data = ConfirmationResponse(
+                confirmation_id=confirmation_id,
+                approved=approved,
+                response=response,
+                remember_decision=remember_decision,
+            )
+
+            resp = await self.client.post(
+                f"/api/v1/confirmations/{confirmation_id}/respond",
+                json=response_data.model_dump(),
+            )
+            resp.raise_for_status()
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to send confirmation response: {e}")
+            return False
 
 
 # Global instance
