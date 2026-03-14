@@ -4,9 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Orbit AI Agent is a Python microservice that implements an intelligent agent capable of understanding natural language and executing shell commands through a safety-first architecture. The project is currently in **Phase 1** of implementation (9/93 steps completed).
+Orbit AI Agent is a Python microservice that implements an intelligent agent capable of understanding natural language and executing shell commands through a safety-first architecture.
 
-The agent uses LangGraph for workflow orchestration, FastAPI for REST APIs, and communicates with a separate NestJS Bridge service for actual shell command execution on user machines.
+The agent uses **LangGraph** for workflow orchestration, **FastAPI** for REST APIs, and communicates with a separate **NestJS Bridge** service for actual shell command execution on user machines.
+
+---
 
 ## Development Commands
 
@@ -29,162 +31,418 @@ make migrate
 # Run single test file
 pytest tests/path/to/test_file.py
 
-# Run with coverage
-pytest --cov=src tests/
+# Run with coverage (80% minimum)
+pytest --cov=src --cov-fail-under=80
+
+# Run specific test pattern
+pytest -k "classifier" -v
+
+# Type checking
+mypy src/ --ignore-missing-imports
 ```
 
-## Architecture
+---
 
-### High-Level Flow
-
-1. User sends message → NestJS Bridge → Python Agent (FastAPI)
-2. LangGraph agent processes intent through node workflow
-3. Tools (shell, etc.) execute via NestJS Bridge
-4. Results returned through Bridge → User
-
-### Component Structure
-
-**`src/main.py`**: FastAPI application entry point with CORS middleware and health endpoints
-
-**`src/agent/`**: LangGraph agent core
-- `graph.py`: StateGraph workflow definition with nodes (`classifier`, `command_generator`, `responder`)
-- `state.py`: TypedDict-based state schema (`AgentState`) - includes messages, intent, command, plan, tool_results, session metadata
-- `nodes/`: Individual workflow nodes - each is a function that receives and returns `AgentState`
-  - `classifier.py`: Determines if user wants command execution or simple response
-  - `command_generator.py`: Translates natural language to shell commands using LLM
-  - `responder.py`: Formats final responses
-
-**`src/tools/`**: LangChain tool implementations
-- `shell.py`: Shell execution tool via NestJS Bridge, with integrated safety verification
-- `base.py`: Base tool class (planned)
-
-**`src/bridge/`**: NestJS Bridge integration
-- `client.py`: HTTP client for communicating with Bridge service (`execute_command`, `list_files`, `read_file`)
-- `schemas.py`: Pydantic models for Bridge requests/responses
-
-**`src/llm/`**: Multi-LLM provider support via factory pattern
-- `factory.py`: `llm_factory(provider, model_name, temperature)` - creates LangChain ChatOpenAI/ChatAnthropic/ChatGoogle instances
-- Providers: `openai` (GPT-4 Turbo), `anthropic` (Claude 3 Opus), `gemini` (Flash)
-- Default provider configured via `DEFAULT_LLM_PROVIDER` env var
-
-**`src/utils/safety.py`**: Two-tier safety verification
-1. **Whitelist**: Simple commands (`ls`, `pwd`, `git status`, etc.) bypass LLM check
-2. **LLM Verification**: Complex commands analyzed by LLM with `temperature=0` for deterministic safety decisions
-- Rejects commands containing dangerous operators: `&`, `;`, `|`, `>`, `<`, `` ` ``, `$`
-
-**`src/api/`**: FastAPI routes
-- `router.py`: Main API router aggregating v1 endpoints
-- `v1/agent.py`: `POST /agent/invoke` endpoint - invokes LangGraph agent
-- `v1/health.py`: Health check endpoints
-
-**`src/config.py`**: Pydantic Settings - all environment variables (PORT, DEBUG, API keys, DATABASE_URL, BRIDGE_URL, etc.)
-
-### LangGraph Workflow Pattern
-
-The agent follows a stateful graph pattern:
+## System Architecture
 
 ```
-START → classifier (classify intent)
-         ↓
-    [conditional edges based on intent]
-    ↓                    ↓
-command_generator   responder
-    ↓                    ↓
-    └────────→ responder → END
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           User's Machine                                 │
+│  ┌─────────────┐                                                        │
+│  │  Desktop    │                                                        │
+│  │  TUI/CLI    │                                                        │
+│  └──────┬──────┘                                                        │
+└─────────┼───────────────────────────────────────────────────────────────┘
+          │ WebSocket
+          ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        NestJS Bridge (:3000)                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                   │
+│  │  WebSocket   │  │    REST      │  │   Shell      │                   │
+│  │  Gateway     │  │    API       │  │   Executor   │                   │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘                   │
+└─────────┼─────────────────┼─────────────────┼───────────────────────────┘
+          │                 │                 │
+          │ HTTP/SSE        │                 │ Local shell
+          ▼                 │                 │
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Python Agent (:8000)                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                   │
+│  │   FastAPI    │  │  LangGraph   │  │   LLM        │                   │
+│  │   REST API   │──│   Agent      │──│   Factory    │                   │
+│  └──────────────┘  └──────────────┘  └──────────────┘                   │
+│         │                 │                                             │
+│         │                 ▼                                             │
+│         │          ┌──────────────┐                                     │
+│         │          │   Safety     │                                     │
+│         │          │   Layer      │                                     │
+│         │          └──────────────┘                                     │
+│         │                                                               │
+│         ▼                                                               │
+│  ┌──────────────┐                                                       │
+│  │  PostgreSQL  │                                                       │
+│  │  (Sessions)  │                                                       │
+│  └──────────────┘                                                       │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-- State is passed between nodes as a dictionary conforming to `AgentState`
-- Conditional routing uses `add_conditional_edges` with routing functions
-- Messages use LangChain's `add_messages` reducer for append-only semantics
+---
 
-### Safety-First Design
+## LangGraph Workflow
 
-All shell commands go through `src/utils/safety.py::is_safe_command()` before execution:
-1. Reject empty commands
-2. Check whitelist for safe prefixes (no dangerous operators)
-3. LLM analysis for everything else
-4. Return `(is_safe: bool, reason: str)` tuple
+### Current Graph Structure
 
-### Async-First Architecture
+```
+┌─────────────┐
+│   START     │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────┐
+│                    CLASSIFIER NODE                       │
+│  • Analyzes user message intent                          │
+│  • Returns: intent, confidence                           │
+└──────┬──────────────────────────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────┐
+│                  ROUTE BY INTENT                         │
+│  ┌─────────────────┬─────────────────┬────────────────┐ │
+│  │  intent=command │  intent=question│  intent=chat   │ │
+│  └────────┬────────┴────────┬────────┴───────┬────────┘ │
+└───────────┼─────────────────┼────────────────┼──────────┘
+            │                 │                │
+            ▼                 ▼                ▼
+   ┌────────────────┐ ┌────────────────┐ ┌────────────────┐
+   │ COMMAND_GEN    │ │   RESPONDER    │ │   RESPONDER    │
+   │ NODE           │ │                │ │                │
+   │ • LLM gen      │ │ • LLM response │ │ • LLM response │
+   │ • Safety check │ │                │ │                │
+   └───────┬────────┘ └───────┬────────┘ └───────┬────────┘
+           │                  │                  │
+           └──────────────────┴──────────────────┘
+                              │
+                              ▼
+                     ┌────────────────┐
+                     │   RESPONDER    │
+                     │   (Final)      │
+                     └───────┬────────┘
+                             │
+                             ▼
+                     ┌─────────────┐
+                     │    END      │
+                     └─────────────┘
+```
 
-- FastAPI endpoints are async
-- LLM calls use `.ainvoke()` methods
-- Bridge client uses `httpx.AsyncClient`
-- Tool execution uses `_arun()` async methods
+### Future: Multi-Step Workflow with HITL
 
-### Bridge Architecture Pattern
+```
+                    START
+                      │
+                      ▼
+              ┌───────────────┐
+              │ SMART_ROUTER  │ ◄── Dynamic integration loading
+              └───────┬───────┘
+                      │
+                      ▼
+              ┌───────────────┐
+              │   PLANNER     │ ◄── LLM creates structured plan
+              └───────┬───────┘
+                      │
+                      ▼
+        ┌─────────────────────────────┐
+        │       ROUTE_EXECUTOR        │
+        │  requires_human_approval?   │
+        └─────────────┬───────────────┘
+                      │
+         ┌────────────┼────────────┐
+         ▼            ▼            ▼
+      [auto]    [approval]    [blocked]
+         │            │            │
+         ▼            ▼            │
+    ┌─────────┐ ┌─────────────┐    │
+    │EXECUTOR │ │AWAIT_APPROVE│    │
+    └────┬────┘ └──────┬──────┘    │
+         │       ┌─────┴─────┐     │
+         │       ▼           ▼     │
+         │   [approved]  [rejected]│
+         │       │           │     │
+         └───────┴───────────┴─────┘
+                      │
+                      ▼
+              ┌───────────────┐
+              │ STEP_COMPLETE │
+              │ more steps?   │
+              └───────┬───────┘
+                      │
+              ┌───────┴───────┐
+              ▼               ▼
+          [continue]       [END]
+              │
+              └──────► (loop back to PLANNER)
+```
 
-The Python API is separated from desktop execution concerns:
-- Python handles LLM, planning, orchestration
-- NestJS Bridge handles actual shell execution on user's machine
-- Communication via HTTP with Bearer token authentication
+---
 
-### Configuration Pattern
+## Component Structure
 
-All settings defined in `src/config.py` as Pydantic `BaseSettings`:
-- Reads from `.env` file automatically
-- Type-hinted fields with defaults
-- `extra="ignore"` for forward compatibility
+```
+src/
+├── main.py                    # FastAPI app entry point
+├── config.py                  # Pydantic Settings (env vars)
+│
+├── agent/                     # LangGraph Agent Core
+│   ├── graph.py              # StateGraph definition
+│   ├── state.py              # AgentState TypedDict
+│   └── nodes/                # Workflow nodes
+│       ├── classifier.py     # Intent classification
+│       ├── command_gen.py    # Command generation
+│       └── responder.py      # Response formatting
+│
+├── tools/                     # LangChain Tools
+│   ├── shell.py              # Shell execution tool
+│   └── base.py               # Base tool class
+│
+├── bridge/                    # NestJS Bridge Client
+│   ├── client.py             # HTTP client
+│   └── schemas.py            # Request/Response models
+│
+├── llm/                       # Multi-LLM Support
+│   └── factory.py            # Provider factory
+│
+├── api/                       # FastAPI Routes
+│   ├── router.py             # Main router
+│   └── v1/
+│       ├── agent.py          # /agent/invoke
+│       └── health.py         # /health
+│
+└── utils/                     # Utilities
+    ├── safety.py             # Command safety verification
+    └── errors.py             # Custom exceptions
+```
 
-### State Machine Design
+---
 
-`AgentState` in `src/agent/state.py` is the single source of truth for agent execution:
-- `messages`: Append-only conversation history with LangChain `add_messages` reducer
-- `intent`: Literal type for type-safe intent values
-- `plan`/`current_step`: For multi-step workflow support (planned)
-- `needs_confirmation`/`confirmation_prompt`: For user confirmation flows (planned)
-- `session_id`/`user_id`: For conversation persistence (planned)
+## State Schema
 
-### Multi-LLM Provider Pattern
+`AgentState` is the **single source of truth**:
 
-Use `src/llm/factory.py::llm_factory()` to create LLM instances:
+```python
+from typing import TypedDict, Annotated, Literal
+from langgraph.graph import add_messages
+
+class AgentState(TypedDict):
+    # Core conversation (append-only)
+    messages: Annotated[list[dict], add_messages]
+
+    # Session context
+    session_id: str
+    user_id: str | None
+
+    # Classification
+    intent: Literal["command", "question", "chat"] | None
+    confidence: float | None
+
+    # Planning (future)
+    plan: list[dict[str, str]] | None
+    current_step: int
+
+    # Execution
+    command: str | None
+    tool_results: list[dict]
+
+    # HITL (future)
+    requires_approval: bool
+    approval_prompt: str | None
+    approved: bool | None
+
+    # Response
+    response: str | None
+
+    # Error handling
+    errors: list[str]
+
+    # Metadata
+    tokens_used: int
+    current_node: str
+```
+
+---
+
+## Safety Layer
+
+All shell commands go through `src/utils/safety.py`:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    COMMAND SAFETY FLOW                           │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │ Empty command?  │──── YES ───► REJECT
+                    └────────┬────────┘
+                             │ NO
+                             ▼
+                    ┌─────────────────┐
+                    │ Dangerous ops?  │──── YES ───► REJECT
+                    │ (&|;< >`$)      │
+                    └────────┬────────┘
+                             │ NO
+                             ▼
+                    ┌─────────────────┐
+                    │ In whitelist?   │──── YES ───► SAFE
+                    │ (ls, pwd, git)  │
+                    └────────┬────────┘
+                             │ NO
+                             ▼
+                    ┌─────────────────┐
+                    │   LLM Verify    │
+                    │ (temp=0)        │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              ▼              ▼              ▼
+           [safe]     [confirm]       [dangerous]
+              │              │              │
+              ▼              ▼              ▼
+           EXECUTE    ASK USER        REJECT
+```
+
+**Whitelisted Commands**:
+- `ls`, `pwd`, `whoami`, `date`
+- `git status`, `git log`, `git branch`
+- `cat` (no redirections), `head`, `tail`
+
+**Always Rejected**:
+- Commands with `&`, `;`, `|`, `>`, `<`, `` ` ``, `$`
+- `rm -rf /`, `sudo`, `chmod 777`
+- Fork bombs, curl-to-bash patterns
+
+---
+
+## Multi-LLM Provider
+
 ```python
 from src.llm.factory import llm_factory
 
-# Use default provider from config
+# Use default provider (from DEFAULT_LLM_PROVIDER env)
 llm = llm_factory(temperature=0)
 
 # Specify provider
-llm = llm_factory(provider="openai", model_name="gpt-4-turbo-preview", temperature=0.7)
+llm = llm_factory(
+    provider="anthropic",
+    model_name="claude-3-opus-20240229",
+    temperature=0.7
+)
+
+# Streaming
+llm = llm_factory(streaming=True)
+async for chunk in llm.astream(prompt):
+    yield chunk.content
 ```
+
+| Provider | Default Model | Env Key |
+|----------|--------------|---------|
+| `openai` | gpt-4-turbo-preview | `OPENAI_API_KEY` |
+| `anthropic` | claude-3-opus-20240229 | `ANTHROPIC_API_KEY` |
+| `gemini` | gemini-pro | `GOOGLE_API_KEY` |
+
+---
 
 ## Environment Variables
 
-Required variables (set in `.env`):
-- `OPENAI_API_KEY`: For OpenAI provider
-- `ANTHROPIC_API_KEY`: For Anthropic provider
-- `GOOGLE_API_KEY`: For Gemini provider
-- `DEFAULT_LLM_PROVIDER`: One of `openai`, `anthropic`, `gemini`
-- `BRIDGE_URL`: URL of NestJS Bridge service
-- `BRIDGE_API_KEY`: Authentication for Bridge (optional)
-- `DATABASE_URL`: PostgreSQL connection string
+```bash
+# Required
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=...
+DEFAULT_LLM_PROVIDER=openai|anthropic|gemini
+BRIDGE_URL=http://localhost:3000
+DATABASE_URL=postgresql://user:pass@localhost:5432/orbit
 
-Optional:
-- `PORT`: API server port (default 8000)
-- `DEBUG`: Enable debug mode (default True)
+# Optional
+BRIDGE_API_KEY=           # Auth for Bridge
+PORT=8000                  # API port
+DEBUG=true                 # Debug mode
+LOG_LEVEL=INFO            # Logging level
+```
+
+---
 
 ## Testing
 
-Test structure is planned but not yet implemented:
 ```
 tests/
-├── unit/          # Unit tests for individual components
-├── integration/   # Integration tests for multi-component flows
-└── e2e/          # End-to-end tests
+├── conftest.py              # Shared fixtures
+├── unit/
+│   ├── test_safety.py       # Safety module
+│   ├── test_classifier.py   # Classifier node
+│   └── test_llm_factory.py  # LLM factory
+├── integration/
+│   ├── test_api.py          # API endpoints
+│   ├── test_bridge.py       # Bridge client
+│   └── test_graph.py        # Full graph
+└── e2e/
+    └── test_agent_flow.py   # End-to-end
 ```
 
-Tests use pytest framework with async support.
+```bash
+# Run all tests with coverage
+pytest --cov=src --cov-fail-under=80
 
-## Future Expansion (Planned)
+# Run specific markers
+pytest -m "not integration"  # Unit tests only
+pytest -m "slow"             # Slow tests only
 
-The codebase is designed for expansion across 8 phases:
-- Phase 1: Basic intent classification, command generation, shell tool (current)
-- Phase 2: Memory system, session persistence
-- Phase 3: Multi-step workflows, planning
-- Phase 4: External tool integrations (Jira, Git, VS Code, etc.)
-- Phase 5: RAG with vector database
-- Phase 6: Advanced workflows, approval flows
-- Phase 7: Observability, monitoring, logging
-- Phase 8: Performance optimization, caching
+# Single test with verbose
+pytest tests/unit/test_safety.py::test_safety_levels -v
+```
 
-See `docs/IMPLEMENTATION_ROADMAP.md` and `docs/ORBIT_AI_PYTHON_BLUEPRINT.md` for detailed plans.
+---
+
+## Code Conventions
+
+| Type | Convention | Example |
+|------|------------|---------|
+| Files | snake_case | `command_generator.py` |
+| Classes | PascalCase | `AgentState` |
+| Functions | snake_case | `generate_plan()` |
+| Constants | SCREAMING_SNAKE_CASE | `MAX_RETRIES` |
+| Private | _underscore | `_internal()` |
+
+**Immutability**: ALWAYS create new objects, never mutate state.
+
+```python
+# BAD
+state["plan"] = new_plan
+
+# GOOD
+new_state = {**state, "plan": new_plan}
+```
+
+---
+
+## Future Roadmap
+
+| Phase | Focus | Status |
+|-------|-------|--------|
+| 1 | Basic classification, command gen, shell tool | Current |
+| 2 | Memory system, session persistence | Planned |
+| 3 | Multi-step workflows, planning | Planned |
+| 4 | External integrations (Jira, Git, VS Code) | Planned |
+| 5 | RAG with vector database | Planned |
+| 6 | Advanced HITL, approval flows | Planned |
+| 7 | Observability, monitoring | Planned |
+| 8 | Performance optimization | Planned |
+
+---
+
+## Related Documentation
+
+- `.claude/agents/` - Specialized agent definitions
+- `.claude/rules/` - Coding standards and patterns
+- `.claude/skills/` - Project-specific skills
+- `.claude/hooks/` - Automated checks
+- `docs/IMPLEMENTATION_ROADMAP.md` - Detailed roadmap
+- `docs/ORBIT_AI_PYTHON_BLUEPRINT.md` - Full blueprint
