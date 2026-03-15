@@ -410,8 +410,8 @@ class MCPClientManager:
 
         for attempt in range(retries):
             try:
-                # Get tools from MultiServerMCPClient
-                tools = self._client.get_tools()
+                # Get tools from MultiServerMCPClient (async)
+                tools = await self._client.get_tools()
 
                 # Filter out blocked tools and sanitize schemas
                 filtered_tools = []
