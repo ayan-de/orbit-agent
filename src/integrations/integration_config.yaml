@@ -32,18 +32,30 @@ integrations:
     planner_hints: ""
     executor_hints: "Format search results with sources and summaries"
 
-  # Gmail
+  # Gmail (via workspace-mcp)
+  # Docs: https://workspacemcp.com/docs#gmail
   gmail:
     tool_names:
-      - send_gmail_message
       - search_gmail_messages
+      - get_gmail_message_content
+      - get_gmail_messages_content_batch
+      - get_gmail_thread_content
+      - get_gmail_threads_content_batch
+      - send_gmail_message
       - draft_gmail_message
       - list_gmail_labels
-      - get_gmail_message
+      - manage_gmail_label
+      - modify_gmail_message_labels
+      - batch_modify_gmail_message_labels
+      - get_gmail_attachment_content
+      - list_gmail_filters
+      - create_gmail_filter
+      - delete_gmail_filter
     display_name: "Gmail"
     icon: "gmail"
     requires_auth: true
     mcp_server: "google_workspace"
+    description: "Email operations via Gmail: sending, drafting, reading, searching, labeling, filtering, and managing email messages and threads."
     request_patterns:
       - '\b(email|mail|gmail)\b'
       - '\b(send|write|compose)\s+(an?\s+)?(email|mail)\b'
@@ -56,8 +68,16 @@ integrations:
       - inbox
       - draft
       - message
-    planner_hints: "Use artifact title as email subject if available"
-    executor_hints: "Never ask for user email - it's implicit. Always confirm before sending."
+    planner_hints: |
+      GMAIL: When user says "mail/send/email this", check AVAILABLE ARTIFACTS for the
+      most recent document or content. Embed its URL and title into the step description.
+      Compose a sensible subject from artifact name if not specified by user.
+    executor_hints: |
+      GMAIL: Use artifact title as email subject if user did not specify one. Include
+      artifact URL in the email body. Use send_gmail_message with to, subject, body params.
+      Do NOT ask the user for subject or body if they can be inferred from artifacts and context.
+      The authenticated user is implicit — NEVER ask for the user's email address or userId.
+      If any Gmail tool fails with an auth error, tell the user to reconnect Gmail.
 
   # Google Docs
   google_docs:
